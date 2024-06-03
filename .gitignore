@@ -3,7 +3,9 @@
 # Data set
 *.txt
 *.mp3
-*dataset*
+# *dataset*
+*maxseats__*
+*.wav
 
 # test, log 
 test_log
