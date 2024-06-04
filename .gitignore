@@ -3,12 +3,22 @@
 # Data set
 *.txt
 *.mp3
-*dataset*
+# *dataset*
+*maxseats__*
+*.wav
+*.json
+*.zip
+*.tar
+
+# Pretrained models
+models*
+*base
 
 # test, log 
 test_log
 test
 log
+.locks
 
 # macOS
 .DS_Store
