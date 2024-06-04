@@ -6,6 +6,7 @@
 # *dataset*
 *maxseats__*
 *.wav
+*.json
 
 # test, log 
 test_log
