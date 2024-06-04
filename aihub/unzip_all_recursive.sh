@@ -3,7 +3,7 @@
 # 상위 폴더 지정
 parent_folder=$(pwd)
 # 출력 폴더 지정
-output_folder="$parent_foler/unzipped_files"
+output_folder="$parent_fodler/unzipped_files"
 
 # 출력 폴더가 존재하지 않으면 생성
 mkdir -p "$output_folder"
