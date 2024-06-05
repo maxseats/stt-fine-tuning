@@ -1,40 +1,42 @@
-from datasets import load_dataset
-import torch
-from dataclasses import dataclass
-from typing import Any, Dict, List, Union
-import evaluate
-from transformers import WhisperTokenizer, WhisperFeatureExtractor, WhisperProcessor, WhisperForConditionalGeneration, Seq2SeqTrainingArguments, Seq2SeqTrainer
-import mlflow
-from mlflow.tracking.client import MlflowClient
-import subprocess
-from huggingface_hub import create_repo, Repository
+import math  # 임시 테스트용
 import os
 import shutil
+import subprocess
+from dataclasses import dataclass
+from typing import Any, Dict, List, Union
+
+import evaluate
 import gdown
-import math # 임시 테스트용
-model_dir = "./tmp" # 수정 X
+import mlflow
+import torch
+from datasets import load_dataset
+from huggingface_hub import Repository, create_repo
+from mlflow.tracking.client import MlflowClient
+from transformers import (Seq2SeqTrainer, Seq2SeqTrainingArguments,
+                          WhisperFeatureExtractor,
+                          WhisperForConditionalGeneration, WhisperProcessor,
+                          WhisperTokenizer)
+
+model_dir = "./tmp"  # 수정 X
 
 
 #########################################################################################################################################
 ################################################### 사용자 설정 변수 #####################################################################
 #########################################################################################################################################
 
-model_description = '''
+model_description = """
 직접 작성해주세요. 
 
 파인튜닝한 데이터셋에 대해 최대한 자세히 설명해주세요.
 
 (데이터셋 종류, 각 용량, 관련 링크 등)
-'''
+"""
 
 # model_name = "openai/whisper-base"
-model_name = "SungBeom/whisper-base-ko" # 대안 : "SungBeom/whisper-small-ko"
+model_name = "SungBeom/whisper-base-ko"  # 대안 : "SungBeom/whisper-small-ko"
+dataset_name = "maxseats/meeting_valid_preprocessed"  # 불러올 데이터셋(허깅페이스 기준)
 
-dataset_name = "maxseats/meeting_valid_preprocessed"    # 불러올 데이터셋(허깅페이스 기준)
-
-
-is_test = True # True: 소량의 샘플 데이터로 테스트, False: 실제 파인튜닝
-
+is_test = True  # True: 소량의 샘플 데이터로 테스트, False: 실제 파인튜닝
 
 training_args = Seq2SeqTrainingArguments(
     output_dir=model_dir,  # 원하는 리포지토리 이름을 입력한다.
@@ -43,7 +45,7 @@ training_args = Seq2SeqTrainingArguments(
     learning_rate=1e-5,
     warmup_steps=500,
     max_steps=2,  # epoch 대신 설정
-    #num_train_epochs=1,     # epoch 수 설정 / max_steps와 이것 중 하나만 설정
+    # num_train_epochs=1,     # epoch 수 설정 / max_steps와 이것 중 하나만 설정
     gradient_checkpointing=True,
     fp16=True,
     evaluation_strategy="steps",
@@ -58,14 +60,14 @@ training_args = Seq2SeqTrainingArguments(
     metric_for_best_model="cer",  # 한국어의 경우 'wer'보다는 'cer'이 더 적합할 것
     greater_is_better=False,
     push_to_hub=True,
-    save_total_limit=5,           # 최대 저장할 모델 수 지정
+    save_total_limit=5,  # 최대 저장할 모델 수 지정
 )
 
 #########################################################################################################################################
 ################################################### 사용자 설정 변수 #####################################################################
 #########################################################################################################################################
 
-    
+
 @dataclass
 class DataCollatorSpeechSeq2SeqWithPadding:
     processor: Any
@@ -111,7 +113,7 @@ def compute_metrics(pred):
 
 
 # 토큰 입력 - maxseats 토큰으로 고정
-token = "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"
+token = "토큰"
 subprocess.run(["huggingface-cli", "login", "--token", token])
 
 
@@ -120,9 +122,9 @@ if os.path.exists(model_dir):
     shutil.rmtree(model_dir)
     os.makedirs(model_dir)
 
-if os.path.exists('./repo'):
-    shutil.rmtree('./repo')
-    os.makedirs('./repo')
+if os.path.exists("./repo"):
+    shutil.rmtree("./repo")
+    os.makedirs("./repo")
 
 
 # 파인튜닝을 진행하고자 하는 모델의 processor, tokenizer, feature extractor, model 로드
@@ -132,11 +134,11 @@ feature_extractor = WhisperFeatureExtractor.from_pretrained(model_name)
 model = WhisperForConditionalGeneration.from_pretrained(model_name)
 
 data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor=processor)
-metric = evaluate.load('cer')
+metric = evaluate.load("cer")
 model.config.forced_decoder_ids = None
 model.config.suppress_tokens = []
 
-                                                        
+
 # Hub로부터 "16khz 전처리가 완료된" 데이터셋을 로드(이게 진짜 오래걸려요.)
 preprocessed_dataset = load_dataset(dataset_name)
 
@@ -145,7 +147,7 @@ if is_test:
     preprocessed_dataset["valid"] = preprocessed_dataset["valid"].select(range(math.ceil(len(preprocessed_dataset) * 0.3)))
 
 # 구글 드라이브의 mlflow.db 파일 받아오기(업데이트)
-gdown.download('https://drive.google.com/uc?id=14v7CGtEI4PPOX7rsS6a4LrWCV-AovuPQ', '/mnt/a/maxseats/mlflow.db', quiet=False)
+gdown.download('https://drive.google.com/uc?id=아이디', '/mnt/a/maxseats/mlflow.db', quiet=False)
 
 # training_args 객체를 JSON 형식으로 변환
 training_args_dict = training_args.to_dict()
@@ -172,10 +174,9 @@ with mlflow.start_run(experiment_id=experiment_id, description=model_description
     # training_args 로깅
     for key, value in training_args_dict.items():
         mlflow.log_param(key, value)
-        
-    
-    mlflow.set_tag("Dataset", dataset_name) # 데이터셋 로깅
-    
+
+    mlflow.set_tag("Dataset", dataset_name)  # 데이터셋 로깅
+
     trainer = Seq2SeqTrainer(
         args=training_args,
         model=model,
@@ -197,8 +198,8 @@ with mlflow.start_run(experiment_id=experiment_id, description=model_description
     model_uri = "runs:/{run_id}/{artifact_path}".format(run_id=mlflow.active_run().info.run_id, artifact_path=model_dir)
     
     # 이 값 이용해서 허깅페이스 모델 이름 설정 예정
-    model_details = mlflow.register_model(model_uri=model_uri, name=model_name.replace('/', '-'))   # 모델 이름에 '/'를 '-'로 대체
-    
+    model_details = mlflow.register_model(model_uri=model_uri, name=model_name.replace("/", "-"))  # 모델 이름에 '/'를 '-'로 대체
+
     # 모델 Description
     client = MlflowClient()
     client.update_model_version(name=model_details.name, version=model_details.version, description=model_description)
@@ -211,15 +212,14 @@ with mlflow.start_run(experiment_id=experiment_id, description=model_description
 
 
 # 리포지토리 이름 설정
-repo_name = "maxseats/" + model_name.replace('/', '-') + '-' + str(model_version)  # 허깅페이스 레포지토리 이름 설정
+repo_name = ("maxseats/" + model_name.replace("/", "-") + "-" + str(model_version))  # 허깅페이스 레포지토리 이름 설정
 
 # 리포지토리 생성
 create_repo(repo_name, exist_ok=True)
 
 
-
 # 리포지토리 클론
-repo = Repository(local_dir='./repo', clone_from=f"{repo_name}")
+repo = Repository(local_dir="./repo", clone_from=f"{repo_name}")
 
 
 # model_dir 필요한 파일 복사
@@ -232,11 +232,11 @@ for root, dirs, files in os.walk(model_dir):
             # 파일 경로 생성
             source_file = os.path.join(root, file)
             # 대상 폴더에 복사
-            shutil.copy(source_file, './repo')
+            shutil.copy(source_file, "./repo")
 
 
 # 토크나이저 다운로드 및 로컬 디렉토리에 저장
-tokenizer.save_pretrained('./repo')
+tokenizer.save_pretrained("./repo")
 
 
 readme = """
@@ -255,11 +255,11 @@ metrics:
 
 # 모델 카드 및 기타 메타데이터 파일 작성
 with open("./repo/README.md", "w") as f:
-    f.write( readme + model_description)
+    f.write(readme + model_description)
 
 # 파일 커밋 푸시
 repo.push_to_hub(commit_message="Initial commit")
 
 # 폴더와 하위 내용 삭제
 shutil.rmtree(model_dir)
-shutil.rmtree('./repo')
+shutil.rmtree("./repo")
