@@ -14,6 +14,7 @@ def parse_args():
     parser.add_argument("--lr", "--learning_rate", type=float, help="Learning rate")
     parser.add_argument("--batch_size", type=int, help="Batch size per device for training")
     parser.add_argument("--max_steps", type=int, help="Max steps for training")
+    parser.add_argument("--test", action='store_true', help="Test mode flag")
 
     args = parser.parse_args()
     return args
@@ -25,6 +26,10 @@ def override_config(config, args):
         config['training_args']['batch_size'] = args.batch_size
     if args.max_steps is not None:
         config['training_args']['max_steps'] = args.max_steps
+    if args.test:
+        config['test'] = True
+    if not args.test:
+        config['test'] = False
     return config
 
 
