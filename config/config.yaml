@@ -11,7 +11,7 @@ training_args:
   # num_train_epochs: 1 # epoch 수 설정 / max_steps와 이것 중 하나만 설정
   gradient_checkpointing: true
   fp16: true
-  evaluation_strategy: "steps"
+  eval_strategy: "steps"
   per_device_eval_batch_size: 8
   predict_with_generate: true
   generation_max_length: 225
