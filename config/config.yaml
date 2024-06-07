@@ -22,5 +22,5 @@ training_args:
   load_best_model_at_end: true
   metric_for_best_model: "cer"  # 한국어의 경우 'wer'보다는 'cer'이 더 적합할 것
   greater_is_better: false
-  push_to_hub: true
+  push_to_hub: false
   save_total_limit: 5 # 최대 저장할 모델 수 지정
