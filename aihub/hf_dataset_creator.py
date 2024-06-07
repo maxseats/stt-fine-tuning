@@ -1,24 +1,47 @@
-import os
+# 원본 데이터 -> 학습가능한 허깅페이스 데이터셋 형태로 변환
 
-from datasets import Audio, Dataset, DatasetDict, load_dataset
+import os
+import subprocess
+import re
+
+from datasets import Audio, Dataset, DatasetDict, config
 from transformers import WhisperFeatureExtractor, WhisperTokenizer
 from tqdm import tqdm
 import pandas as pd
 
-# DIR_PATH = os.path.dirname(__file__)
-# low_call_voices_prepreocessed = load_dataset("maxseats/meeting_valid_preprocessed", cache_dir=DIR_PATH)
-# print(type(low_call_voices_prepreocessed))
-# print(low_call_voices_prepreocessed)
-# print('-'*80)
+
 
 ############################################
 # 오디오(.wav), label(.txt) 불러오기
 # 경로 설정은 각자 다를테니 알아서 잘 설정 부탁드려요.
-DIR_PATH = os.path.dirname(__file__)
-DATA_DIR = os.path.join(DIR_PATH, "unzipped_files")
 
-feature_extractor = WhisperFeatureExtractor.from_pretrained("openai/whisper-base", cache_dir=DIR_PATH)
-tokenizer = WhisperTokenizer.from_pretrained("openai/whisper-base", language="Korean", task="transcribe", cache_dir=DIR_PATH)
+# aihubshell -mode l -> 데이터셋 별 datasetkey 확인
+
+# 사전 작업 1
+#   tmux new -s maxseats_aihub
+#   cd /mnt/a/maxseats/aihub 
+#   aihubshell -mode d -datasetkey 71481 -aihubid oooooo123456@naver.com -aihubpw neuroflow37!
+# 명령어 입력을 통한 AI hub 데이터셋 다운로드 ( 71481 : 전문분야 심층인터뷰 데이터 )
+
+# 사전 작업 2
+#   ./unzip_all_recursive.sh
+# AI hub 데이터셋 압축 해제 후 하나의 폴더에 모든 파일을 담아주는 명령어
+
+DIR_PATH = os.path.dirname(__file__)
+DATA_DIR = 'maxseats-git/maxseats-ignore/aihub/Test_sample' # os.path.join(DIR_PATH, "Test") # 압축 해제된 파일들 있는 폴더
+CACHE_DIR = '/mnt/a'    # 허깅페이스 캐시 저장소 지정 / 테스트 :  os.path.join(DIR_PATH, "cache_test")
+
+
+
+dataset_name = "maxseats/bracket-test-dataset-tmp" # 허깅페이스에 올라갈 데이터셋 이름
+model_name = "SungBeom/whisper-small-ko" #"openai/whisper-base"
+
+
+# 캐시 디렉토리 설정
+os.environ['HF_HOME'] = CACHE_DIR
+os.environ["HF_DATASETS_CACHE"] = CACHE_DIR
+feature_extractor = WhisperFeatureExtractor.from_pretrained(model_name, cache_dir=CACHE_DIR)
+tokenizer = WhisperTokenizer.from_pretrained(model_name, language="Korean", task="transcribe", cache_dir=CACHE_DIR)
 
 def exclude_json_files(file_names: list) -> list:
     # .json으로 끝나는 원소 제거
@@ -50,6 +73,17 @@ def get_wav_list(directory):
 
     return wav_files
 
+def bracket_preprocess(text):
+    # 괄호 전처리
+    
+    # 1단계: o/ n/ 글자/ 과 같이. 앞 뒤에 ) ( 가 오지않는 /슬래쉬 는 모두 제거합니다. o,n 이 붙은 경우 해당 글자도 함께 제거합니다.
+    text = re.sub(r'\b[o|n]/', '', text)
+    text = re.sub(r'[^()]/', '', text)
+    
+    # 2단계: (70)/(칠십) 과 같은 경우, /슬래쉬 의 앞쪽 괄호의 내용만 남기고 삭제합니다.
+    text = re.sub(r'\(([^)]*)\)/\([^)]*\)', r'\1', text)
+    
+    return text
 
 def prepare_dataset(batch):
     # 오디오 파일을 16kHz로 로드
@@ -58,9 +92,13 @@ def prepare_dataset(batch):
     # input audio array로부터 log-Mel spectrogram 변환
     batch["input_features"] = feature_extractor(audio["array"], sampling_rate=audio["sampling_rate"]).input_features[0]
 
-    # target text를 label ids로 변환
-    batch["labels"] = tokenizer(batch["transcripts"]).input_ids
+    # 괄호 전처리
+    batch["transcripts"] = bracket_preprocess(batch["transcripts"])
 
+    # target text를 label ids로 변환
+    # batch["labels"] = tokenizer(batch["transcripts"]).input_ids
+    batch["labels"] = batch["transcripts"]
+    
     # 'input_features'와 'labels'만 포함한 새로운 딕셔너리 생성
     return {"input_features": batch["input_features"], "labels": batch["labels"]}
 
@@ -93,9 +131,16 @@ datasets = DatasetDict(
      "valid": test_valid["train"]}
 )
 
-datasets = datasets.map(prepare_dataset, num_proc=None)
+datasets = datasets.map(prepare_dataset, num_proc=None, batch_size=10000)
 datasets = datasets.remove_columns(['audio', 'transcripts']) # 불필요한 부분 제거
 print('-'*48)
 print(type(datasets))
 print(datasets)
 print('-'*48)
+
+# 허깅페이스 토큰
+token = "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"
+subprocess.run(["huggingface-cli", "login", "--token", token])
+
+# 전처리 완료된 데이터셋을 Hubdataset_name에 저장
+datasets.push_to_hub(dataset_name)
