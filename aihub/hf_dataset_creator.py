@@ -96,8 +96,7 @@ def prepare_dataset(batch):
     batch["transcripts"] = bracket_preprocess(batch["transcripts"])
 
     # target text를 label ids로 변환
-    # batch["labels"] = tokenizer(batch["transcripts"]).input_ids
-    batch["labels"] = batch["transcripts"]
+    batch["labels"] = tokenizer(batch["transcripts"]).input_ids
     
     # 'input_features'와 'labels'만 포함한 새로운 딕셔너리 생성
     return {"input_features": batch["input_features"], "labels": batch["labels"]}
