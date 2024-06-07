@@ -27,11 +27,12 @@ import pandas as pd
 # AI hub 데이터셋 압축 해제 후 하나의 폴더에 모든 파일을 담아주는 명령어
 
 DIR_PATH = os.path.dirname(__file__)
-DATA_DIR = 'maxseats-git/maxseats-ignore/aihub/Test_sample' # os.path.join(DIR_PATH, "Test") # 압축 해제된 파일들 있는 폴더
+DATA_DIR = 'maxseats-git/maxseats-ignore/discord_dataset' # os.path.join(DIR_PATH, "Test") # 압축 해제된 파일들 있는 폴더
 CACHE_DIR = '/mnt/a'    # 허깅페이스 캐시 저장소 지정 / 테스트 :  os.path.join(DIR_PATH, "cache_test")
 
-dataset_name = "maxseats/mp3-wav-test-dataset-tmp" # 허깅페이스에 올라갈 데이터셋 이름
+dataset_name = "maxseats/mp3-test-dataset-tmp" # 허깅페이스에 올라갈 데이터셋 이름
 model_name = "SungBeom/whisper-small-ko" #"openai/whisper-base"
+token = "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" # 허깅페이스 토큰
 
 # 캐시 디렉토리 설정
 os.environ['HF_HOME'] = CACHE_DIR
@@ -132,8 +133,6 @@ print(type(datasets))
 print(datasets)
 print('-'*48)
 
-# 허깅페이스 토큰
-token = "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"
 subprocess.run(["huggingface-cli", "login", "--token", token])
 
 # 전처리 완료된 데이터셋을 Hubdataset_name에 저장
