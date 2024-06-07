@@ -5,7 +5,7 @@ training_args:
   output_dir: "./tmp"   # <- 수정이 필요할 듯
   per_device_train_batch_size: 16
   gradient_accumulation_steps: 1
-  learning_rate: 1e-5
+  learning_rate: .00001
   warmup_steps: 500
   max_steps: 2 # epoch 대신 설정
   # num_train_epochs: 1 # epoch 수 설정 / max_steps와 이것 중 하나만 설정
