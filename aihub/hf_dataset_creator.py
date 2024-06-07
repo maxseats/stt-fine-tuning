@@ -10,7 +10,6 @@ from tqdm import tqdm
 import pandas as pd
 
 
-
 ############################################
 # 오디오(.wav), label(.txt) 불러오기
 # 경로 설정은 각자 다를테니 알아서 잘 설정 부탁드려요.
@@ -31,11 +30,8 @@ DIR_PATH = os.path.dirname(__file__)
 DATA_DIR = 'maxseats-git/maxseats-ignore/aihub/Test_sample' # os.path.join(DIR_PATH, "Test") # 압축 해제된 파일들 있는 폴더
 CACHE_DIR = '/mnt/a'    # 허깅페이스 캐시 저장소 지정 / 테스트 :  os.path.join(DIR_PATH, "cache_test")
 
-
-
-dataset_name = "maxseats/bracket-test-dataset-tmp" # 허깅페이스에 올라갈 데이터셋 이름
+dataset_name = "maxseats/mp3-wav-test-dataset-tmp" # 허깅페이스에 올라갈 데이터셋 이름
 model_name = "SungBeom/whisper-small-ko" #"openai/whisper-base"
-
 
 # 캐시 디렉토리 설정
 os.environ['HF_HOME'] = CACHE_DIR
@@ -54,27 +50,26 @@ def get_label_list(directory):
 
     # 디렉토리 내 파일 목록 불러오기
     for filename in os.listdir(directory):
-        # 파일 이름에 'label'이 포함되어 있고 '.txt'로 끝나는지 확인
-        if 'label' in filename and filename.endswith('.txt'):
+        # 파일 이름이 '.txt'로 끝나는지 확인
+        if filename.endswith('.txt'):
             label_files.append(os.path.join(DATA_DIR, filename))
 
     return label_files
 
 
-def get_wav_list(directory):
+def get_audio_list(directory):
     # 빈 리스트 생성
-    wav_files = []
+    audio_files = []
 
     # 디렉토리 내 파일 목록 불러오기
     for filename in os.listdir(directory):
-        # 파일 이름에 'label'이 포함되어 있고 '.txt'로 끝나는지 확인
-        if 'wav' in filename and filename.endswith('.wav'):
-            wav_files.append(os.path.join(DATA_DIR, filename))
+        # 파일 이름이 '.wav'나 '.mp3'로 끝나는지 확인
+        if filename.endswith('.wav') or filename.endswith('mp3'):
+            audio_files.append(os.path.join(DATA_DIR, filename))
 
-    return wav_files
+    return audio_files
 
 def bracket_preprocess(text):
-    # 괄호 전처리
     
     # 1단계: o/ n/ 글자/ 과 같이. 앞 뒤에 ) ( 가 오지않는 /슬래쉬 는 모두 제거합니다. o,n 이 붙은 경우 해당 글자도 함께 제거합니다.
     text = re.sub(r'\b[o|n]/', '', text)
@@ -103,7 +98,7 @@ def prepare_dataset(batch):
 
 
 label_data = get_label_list(DATA_DIR)
-wav_data = get_wav_list(DATA_DIR)
+audio_data = get_audio_list(DATA_DIR)
 
 transcript_list = []
 for label in tqdm(label_data):
@@ -112,12 +107,12 @@ for label in tqdm(label_data):
         transcript_list.append(line)
 
 df = pd.DataFrame(data=transcript_list, columns = ["transcript"]) # 정답 label
-df['wav_data'] = wav_data # 오디오 파일 경로
+df['audio_data'] = audio_data # 오디오 파일 경로
 
 # 오디오 파일 경로를 dict의 "audio" 키의 value로 넣고 이를 데이터셋으로 변환
 # 이때, Whisper가 요구하는 사양대로 Sampling rate는 16,000으로 설정한다.
 ds = Dataset.from_dict(
-    {"audio": [path for path in df["wav_data"]],
+    {"audio": [path for path in df["audio_data"]],
      "transcripts": [transcript for transcript in df["transcript"]]}
 ).cast_column("audio", Audio(sampling_rate=16000))
 
