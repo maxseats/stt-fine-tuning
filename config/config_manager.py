@@ -79,8 +79,6 @@ def get_components(config):
     dataset_name = config["dataset_name"]
 
     model = WhisperForConditionalGeneration.from_pretrained(model_name)
-    model.config.forced_decoder_ids = None
-    model.config.suppress_tokens = []
     preprocessed_dataset = load_dataset(dataset_name)
     processor = WhisperProcessor.from_pretrained(model_name, language="Korean", task="transcribe")
     tokenizer = WhisperTokenizer.from_pretrained(model_name, language="Korean", task="transcribe")
