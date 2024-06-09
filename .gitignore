@@ -14,11 +14,16 @@
 models*
 *base
 
+# MLflow
+mlruns
+
 # test, log 
 test_log
 test
 log
 .locks
+tmp
+.tmp
 
 # macOS
 .DS_Store

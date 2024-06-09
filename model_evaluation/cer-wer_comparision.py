@@ -1,5 +1,17 @@
+''' Author: @maxseats
+모든 모델은 모델명과 버전으로 구분해요.
+
+ex) 
+    model_name = "openai/whisper-base"
+    model_version = 3
+    
+결과는 test_log_path에 저장되어요.
+
+사용법 참고: https://pss2947.atlassian.net/issues/SCRUM-40?filter=10007
 '''
-@maxseats(김민석)의 whisper_test.ipynb 파일을 참고하여 작성했습니다.
+
+''' Author: @kooqooo
+@maxseats의 whisper_test.ipynb 파일을 참고하여 작성했습니다.
 
 원본 파일과 설명은 아래의 링크에서 받을 수 있습니다.
 https://koogmlcks.notion.site/32f5ab9b703047d3a6002770ddf65e15?pvs=4
