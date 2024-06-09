@@ -24,3 +24,7 @@ training_args:
   greater_is_better: false
   push_to_hub: false
   save_total_limit: 5 # 최대 저장할 모델 수 지정
+
+mlflow:
+  # tracking_uri: "sqlite:////mnt/a/maxseats/mlflow.db"
+  tracking_uri: ""
