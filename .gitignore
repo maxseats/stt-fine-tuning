@@ -14,6 +14,9 @@
 models*
 *base
 
+# MLflow
+mlruns
+
 # test, log 
 test_log
 test
