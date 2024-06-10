@@ -1,5 +1,11 @@
 model_name: "SungBeom/whisper-small-ko"
 dataset_name: "maxseats/meeting_valid_preprocessed"  # 불러올 데이터셋(허깅페이스 기준)
+model_description: |
+  직접 작성해주세요.
+
+  파인튜닝한 데이터셋에 대해 최대한 자세히 설명해주세요.
+  
+  (데이터셋 종류, 각 용량, 관련 링크 등)
 
 training_args:
   output_dir: "./.tmp"   # <- 수정이 필요할 듯
