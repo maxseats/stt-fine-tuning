@@ -2,9 +2,8 @@ import os
 import json
 from pydub import AudioSegment
 from tqdm import tqdm
-import subprocess
 import re
-from datasets import Audio, Dataset, DatasetDict, config
+from datasets import Audio, Dataset, DatasetDict
 from transformers import WhisperFeatureExtractor, WhisperTokenizer
 import pandas as pd
 
@@ -28,14 +27,11 @@ model_name = "SungBeom/whisper-small-ko"                            # 대상 모
 
 
 
-
-
 '''
 데이터셋 경로를 지정해서
 하나의 폴더에 mp3, txt 파일로 추출해요.
 추출 과정에서 원본 파일은 자동으로 삭제돼요. (저장공간 절약을 위해)
 '''
-
 
 def process_audio_and_subtitle(json_path, audio_base_dir, output_dir):
     # JSON 파일 읽기
@@ -113,12 +109,9 @@ process_all_files(json_base_dir, audio_base_dir, output_dir)
 
 
 
-
-
 '''
 가공된 mp3, txt 데이터를 학습 가능한 허깅페이스 데이터셋 형태로 변환해요.
 '''
-
 
 # 캐시 디렉토리 설정
 os.environ['HF_HOME'] = CACHE_DIR
@@ -218,8 +211,6 @@ print('-'*48)
 print(type(datasets))
 print(datasets)
 print('-'*48)
-
-
 
 
 '''
