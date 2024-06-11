@@ -4,11 +4,10 @@ import os
 import subprocess
 import re
 
-from datasets import Audio, Dataset, DatasetDict, config
+from datasets import Audio, Dataset, DatasetDict
 from transformers import WhisperFeatureExtractor, WhisperTokenizer
 from tqdm import tqdm
 import pandas as pd
-
 
 ############################################
 # 오디오(.wav), label(.txt) 불러오기
@@ -19,26 +18,23 @@ import pandas as pd
 # 사전 작업 1
 #   tmux new -s maxseats_aihub
 #   cd /mnt/a/maxseats/aihub 
-#   aihubshell -mode d -datasetkey 71481 -aihubid oooooo123456@naver.com -aihubpw neuroflow37!
+#   aihubshell -mode d -datasetkey 71481 -aihubid oooooo123456@naver.com -aihubpw 비밀번호는 maxseats에게 문의바람
 # 명령어 입력을 통한 AI hub 데이터셋 다운로드 ( 71481 : 전문분야 심층인터뷰 데이터 )
 
 # 사전 작업 2
 #   ./unzip_all_recursive.sh
 # AI hub 데이터셋 압축 해제 후 하나의 폴더에 모든 파일을 담아주는 명령어
 
-DIR_PATH = os.path.dirname(__file__)
-DATA_DIR = 'maxseats-git/maxseats-ignore/discord_dataset' # os.path.join(DIR_PATH, "Test") # 압축 해제된 파일들 있는 폴더
-CACHE_DIR = '/mnt/a'    # 허깅페이스 캐시 저장소 지정 / 테스트 :  os.path.join(DIR_PATH, "cache_test")
+DIR_PATH = os.path.dirname(os.path.dirname(__file__))   # .git이 있는 작업 폴더 경로
+DATA_DIR = os.path.join(DIR_PATH, 'maxseats-ignore/discord_dataset') # os.path.join(DIR_PATH, "Test") # 압축 해제된 파일들 있는 폴더
+CACHE_DIR = os.getenv("HF_HOME", "/mnt/a/.cache/huggingface")    # 허깅페이스 캐시 저장소 지정 / 테스트 :  os.path.join(DIR_PATH, "cache_test")
 
 dataset_name = "maxseats/mp3-test-dataset-tmp" # 허깅페이스에 올라갈 데이터셋 이름
-model_name = "SungBeom/whisper-small-ko" #"openai/whisper-base"
-token = "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" # 허깅페이스 토큰
+model_name = "SungBeom/whisper-small-ko" # "openai/whisper-base"
+token = "hf_ExampleToken" # 허깅페이스 토큰
 
-# 캐시 디렉토리 설정
-os.environ['HF_HOME'] = CACHE_DIR
-os.environ["HF_DATASETS_CACHE"] = CACHE_DIR
-feature_extractor = WhisperFeatureExtractor.from_pretrained(model_name, cache_dir=CACHE_DIR)
-tokenizer = WhisperTokenizer.from_pretrained(model_name, language="Korean", task="transcribe", cache_dir=CACHE_DIR)
+feature_extractor = WhisperFeatureExtractor.from_pretrained(model_name)
+tokenizer = WhisperTokenizer.from_pretrained(model_name, language="Korean", task="transcribe")
 
 def exclude_json_files(file_names: list) -> list:
     # .json으로 끝나는 원소 제거
