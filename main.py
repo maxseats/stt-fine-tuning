@@ -21,6 +21,8 @@ def main():
     # dataset_path = os.path.join(HF_DATASETS_CACHE, config["dataset_name"].replace('/', '___')) # 데이터셋을 Huggingface에서 불러오는 경우
     # dataset_path = config["dataset_name"] # 데이터셋을 로컬에서 불러오는 경우
     
+    mlflow.set_tracking_uri(config["mlflow"]["tracking_uri"]) # MLflow 기록 저장 위치 설정
+    
     # MLflow 실험 이름을 모델 이름으로 설정
     experiment_name = config["model_name"]
     existing_experiment = mlflow.get_experiment_by_name(experiment_name)
