@@ -9,17 +9,17 @@ import pandas as pd
 
 # 사용자 지정 변수를 설정해요.
 
-DATA_DIR = '/mnt/a/maxseats/(주의-원본)주요 영역별 회의 음성인식 데이터' # 데이터셋이 저장된 폴더
+# DATA_DIR = '/mnt/a/maxseats/(주의-원본-680GB)주요 영역별 회의 음성인식 데이터' # 데이터셋이 저장된 폴더
+DATA_DIR = '/mnt/a/maxseats/split_files/set_0'  # 첫 10GB 테스트
 
 # 원천, 라벨링 데이터 폴더 지정
 json_base_dir = DATA_DIR
 audio_base_dir = DATA_DIR
-output_dir = '/mnt/a/maxseats/(주의-원본)clips'                     # 가공된 데이터셋이 저장될 폴더
+output_dir = '/mnt/a/maxseats/(주의-원본)clips_set_0'                     # 가공된 데이터셋이 저장될 폴더
 token = "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"                     # 허깅페이스 토큰
 CACHE_DIR = '/mnt/a/maxseats/.cache'                                # 허깅페이스 캐시 저장소 지정
-dataset_name = "maxseats/aihub-464-preprocessed-680GB"              # 허깅페이스에 올라갈 데이터셋 이름
+dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-0"              # 허깅페이스에 올라갈 데이터셋 이름
 model_name = "SungBeom/whisper-small-ko"                            # 대상 모델 / "openai/whisper-base"
-
 
 
 '''
@@ -30,14 +30,11 @@ model_name = "SungBeom/whisper-small-ko"                            # 대상 모
 
 def bracket_preprocess(text):
     
-    # 1단계: o/ n/ 글자/ 과 같이. 앞 뒤에 ) ( 가 오지않는 /슬래쉬 는 모두 제거합니다. o,n 이 붙은 경우 해당 글자도 함께 제거합니다.
-    text = re.sub(r'\b[o|n]/', '', text)
-    text = re.sub(r'[^()]/', '', text)
+    # 정규 표현식을 사용하여 패턴 제거
+    text = re.sub(r'/\([^\)]+\)', '', text)  # /( *) 패턴 제거, /(...) 형식 제거
+    text = re.sub(r'[()]', '', text)         # 개별적으로 등장하는 ( 및 ) 제거
     
-    # 2단계: (70)/(칠십) 과 같은 경우, /슬래쉬 의 앞쪽 괄호의 내용만 남기고 삭제합니다.
-    text = re.sub(r'\(([^)]*)\)/\([^)]*\)', r'\1', text)
-    
-    return text
+    return text.strip()
 
 def process_audio_and_subtitle(json_path, audio_base_dir, output_dir):
     # JSON 파일 읽기
@@ -62,13 +59,16 @@ def process_audio_and_subtitle(json_path, audio_base_dir, output_dir):
         print(f"Audio file {audio_file} does not exist.")
         return
     
-    audio = AudioSegment.from_wav(audio_file)
+    audio = AudioSegment.from_mp3(audio_file)
     
     # 발화 데이터 처리
     for utterance in data['utterance']:
         start_time = float(utterance['start']) * 1000  # 밀리초로 변환
         end_time = float(utterance['end']) * 1000      # 밀리초로 변환
-        text = utterance['form']
+        text = bracket_preprocess(utterance['form'])   # 괄호 전처리
+        
+        if not text:    # 비어 있으면 수행 x
+            continue
         
         # 오디오 클립 추출
         audio_clip = audio[start_time:end_time]
@@ -83,7 +83,7 @@ def process_audio_and_subtitle(json_path, audio_base_dir, output_dir):
         
         # 괄호 전처리 텍스트 파일 저장
         with open(text_output_path, 'w', encoding='utf-8') as f:
-            f.write(bracket_preprocess(text))
+            f.write(text)
 
     # 오디오 파일 삭제
     os.remove(audio_file)
@@ -209,7 +209,7 @@ print('-'*48)
 '''
 허깅페이스 로그인 후, 최종 데이터셋을 업로드해요.
 '''
-# datasets.save_to_disk('/mnt/a/maxseats/preprocessed_cache.arrow')
+datasets.save_to_disk('/mnt/a/maxseats/preprocessed_cache.arrow')
 # datasets.push_to_hub(dataset_name, token=token)
 
 while True:
