@@ -1,9 +1,11 @@
-# template
+## 📜 Background
+### 데이터셋 구축
+- AI hub의 데이터셋을 준비하는 과정이에요.( 현재 데이터셋 : 주요 영역별 회의 음성인식 데이터셋)
+- 파인튜닝 직전 단계의 전처리 데이터셋을 구축해서,
+- 허깅페이스에 업로드 하는 것 까지가 목표에요. 
 
-템플릿 파일
-
-
-## Reference
-
-- https://github.com/monologg/python-template
-- https://github.com/boostcampaitech6/level1-semantictextsimilarity-nlp-04/tree/main/.github
+## 📝 To do 
+- [x] 오디오(mp3), 텍스트(txt) 파일 매핑
+- [x] 괄호 전처리
+- [x] 16khz 전처리
+- [ ] 허깅페이스 업로드
