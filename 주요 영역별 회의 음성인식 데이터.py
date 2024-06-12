@@ -10,7 +10,7 @@ import pandas as pd
 # 사용자 지정 변수를 설정해요.
 
 # DATA_DIR = '/mnt/a/maxseats/(주의-원본-680GB)주요 영역별 회의 음성인식 데이터' # 데이터셋이 저장된 폴더
-DATA_DIR = '/mnt/a/maxseats/split_files/set_0'  # 첫 10GB 테스트
+DATA_DIR = '/mnt/a/maxseats/(주의-원본)split_files'  # 첫 10GB 테스트
 
 # 원천, 라벨링 데이터 폴더 지정
 json_base_dir = DATA_DIR
