@@ -63,8 +63,8 @@ def process_audio_and_subtitle(json_path, audio_base_dir, output_dir):
     
     # 발화 데이터 처리
     for utterance in data['utterance']:
-        start_time = float(utterance['start']) * 1000  # 밀리초로 변환
-        end_time = float(utterance['end']) * 1000      # 밀리초로 변환
+        start_time = float(utterance['start']) * 1000.0# 밀리초로 변환
+        end_time = float(utterance['end']) * 1000.0    # 밀리초로 변환
         text = bracket_preprocess(utterance['form'])   # 괄호 전처리
         
         if not text:    # 비어 있으면 수행 x
