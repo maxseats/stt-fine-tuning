@@ -9,20 +9,15 @@ import pandas as pd
 
 # 사용자 지정 변수를 설정해요.
 
-DATA_DIR = '/mnt/a/maxseats-git/New_Sample' # 데이터셋이 저장된 폴더
+DATA_DIR = '/mnt/a/maxseats/(주의-원본)주요 영역별 회의 음성인식 데이터' # 데이터셋이 저장된 폴더
 
 # 원천, 라벨링 데이터 폴더 지정
-json_base_dir = os.path.join(DATA_DIR, '라벨링데이터')
-audio_base_dir = os.path.join(DATA_DIR, '원천데이터')
-
-output_dir = '/mnt/a/maxseats-git/주요 영역별 회의 음성인식 데이터'   # 가공된 데이터셋이 저장될 폴더
-
-token = "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"                     # 허깅페이스 토큰
-
+json_base_dir = DATA_DIR
+audio_base_dir = DATA_DIR
+output_dir = '/mnt/a/maxseats/(주의-원본)clips'                     # 가공된 데이터셋이 저장될 폴더
+token = "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"                     # 허깅페이스 토큰
 CACHE_DIR = '/mnt/a/maxseats/.cache'                                # 허깅페이스 캐시 저장소 지정
-
-dataset_name = "maxseats/aihub-py-test-dataset-tmp"                    # 허깅페이스에 올라갈 데이터셋 이름
-
+dataset_name = "maxseats/aihub-464-preprocessed-680GB"              # 허깅페이스에 올라갈 데이터셋 이름
 model_name = "SungBeom/whisper-small-ko"                            # 대상 모델 / "openai/whisper-base"
 
 
@@ -32,6 +27,17 @@ model_name = "SungBeom/whisper-small-ko"                            # 대상 모
 하나의 폴더에 mp3, txt 파일로 추출해요.
 추출 과정에서 원본 파일은 자동으로 삭제돼요. (저장공간 절약을 위해)
 '''
+
+def bracket_preprocess(text):
+    
+    # 1단계: o/ n/ 글자/ 과 같이. 앞 뒤에 ) ( 가 오지않는 /슬래쉬 는 모두 제거합니다. o,n 이 붙은 경우 해당 글자도 함께 제거합니다.
+    text = re.sub(r'\b[o|n]/', '', text)
+    text = re.sub(r'[^()]/', '', text)
+    
+    # 2단계: (70)/(칠십) 과 같은 경우, /슬래쉬 의 앞쪽 괄호의 내용만 남기고 삭제합니다.
+    text = re.sub(r'\(([^)]*)\)/\([^)]*\)', r'\1', text)
+    
+    return text
 
 def process_audio_and_subtitle(json_path, audio_base_dir, output_dir):
     # JSON 파일 읽기
@@ -75,9 +81,9 @@ def process_audio_and_subtitle(json_path, audio_base_dir, output_dir):
         # 오디오 클립 저장
         audio_clip.export(audio_output_path, format='mp3')
         
-        # 텍스트 파일 저장
+        # 괄호 전처리 텍스트 파일 저장
         with open(text_output_path, 'w', encoding='utf-8') as f:
-            f.write(text)
+            f.write(bracket_preprocess(text))
 
     # 오디오 파일 삭제
     os.remove(audio_file)
@@ -149,17 +155,6 @@ def get_audio_list(directory):
 
     return audio_files
 
-def bracket_preprocess(text):
-    
-    # 1단계: o/ n/ 글자/ 과 같이. 앞 뒤에 ) ( 가 오지않는 /슬래쉬 는 모두 제거합니다. o,n 이 붙은 경우 해당 글자도 함께 제거합니다.
-    text = re.sub(r'\b[o|n]/', '', text)
-    text = re.sub(r'[^()]/', '', text)
-    
-    # 2단계: (70)/(칠십) 과 같은 경우, /슬래쉬 의 앞쪽 괄호의 내용만 남기고 삭제합니다.
-    text = re.sub(r'\(([^)]*)\)/\([^)]*\)', r'\1', text)
-    
-    return text
-
 def prepare_dataset(batch):
     # 오디오 파일을 16kHz로 로드
     audio = batch["audio"]
@@ -167,8 +162,6 @@ def prepare_dataset(batch):
     # input audio array로부터 log-Mel spectrogram 변환
     batch["input_features"] = feature_extractor(audio["array"], sampling_rate=audio["sampling_rate"]).input_features[0]
 
-    # 괄호 전처리
-    batch["transcripts"] = bracket_preprocess(batch["transcripts"])
 
     # target text를 label ids로 변환
     batch["labels"] = tokenizer(batch["transcripts"]).input_ids
@@ -205,7 +198,7 @@ datasets = DatasetDict(
      "valid": test_valid["train"]}
 )
 
-datasets = datasets.map(prepare_dataset, num_proc=None, batch_size=10000)
+datasets = datasets.map(prepare_dataset, num_proc=2)
 datasets = datasets.remove_columns(['audio', 'transcripts']) # 불필요한 부분 제거
 print('-'*48)
 print(type(datasets))
@@ -216,5 +209,18 @@ print('-'*48)
 '''
 허깅페이스 로그인 후, 최종 데이터셋을 업로드해요.
 '''
-# datasets.save_to_disk('./preprocessed_cache.arrow')
-datasets.push_to_hub(dataset_name, token=token)
+# datasets.save_to_disk('/mnt/a/maxseats/preprocessed_cache.arrow')
+# datasets.push_to_hub(dataset_name, token=token)
+
+while True:
+    
+    if token =="exit":
+        break
+    
+    try:
+        datasets.push_to_hub(dataset_name, token=token)
+        print(f"Dataset {dataset_name} pushed to hub successfully. 넘나 축하.")
+        break
+    except Exception as e:
+        print(f"Failed to push dataset: {e}")
+        token = input("Please enter your Hugging Face API token: ")
