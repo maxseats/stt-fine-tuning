@@ -60,15 +60,21 @@ def process_audio_and_subtitle(json_path, audio_base_dir, output_dir):
         return
     
     audio = AudioSegment.from_mp3(audio_file)
+    audio_length_ms = len(audio)
     
     # 발화 데이터 처리
     for utterance in data['utterance']:
-        start_time = float(utterance['start']) * 1000.0# 밀리초로 변환
-        end_time = float(utterance['end']) * 1000.0    # 밀리초로 변환
+        start_time = int(float(utterance['start']) * 1000.0)# 밀리초로 변환
+        end_time = int(float(utterance['end']) * 1000.0)    # 밀리초로 변환
         text = bracket_preprocess(utterance['form'])   # 괄호 전처리
         
         if not text:    # 비어 있으면 수행 x
             continue
+        
+        # 비정상적인 start_time 및 end_time 감지
+        if start_time < 0 or end_time > audio_length_ms or start_time >= end_time:
+            continue
+        
         
         # 오디오 클립 추출
         audio_clip = audio[start_time:end_time]
@@ -198,7 +204,7 @@ datasets = DatasetDict(
      "valid": test_valid["train"]}
 )
 
-datasets = datasets.map(prepare_dataset, num_proc=2)
+datasets = datasets.map(prepare_dataset, num_proc=1)
 datasets = datasets.remove_columns(['audio', 'transcripts']) # 불필요한 부분 제거
 print('-'*48)
 print(type(datasets))
