@@ -3,7 +3,7 @@ import json
 from pydub import AudioSegment
 from tqdm import tqdm
 import re
-from datasets import Audio, Dataset, DatasetDict, load_from_disk, concatenate_datasets
+from datasets import Audio, Dataset, DatasetDict, load_dataset, concatenate_datasets
 from transformers import WhisperFeatureExtractor, WhisperTokenizer
 import pandas as pd
 import shutil
@@ -34,22 +34,20 @@ os.environ['HF_DATASETS_CACHE'] = CACHE_DIR
 
 
 
-# 모든 배치 데이터셋 로드
-batch_dirs = [os.path.join(CACHE_DIR, batch) for batch in os.listdir(CACHE_DIR) if batch.startswith('batch_')]
-loaded_batches = [load_from_disk(batch_dir) for batch_dir in batch_dirs]
+# 캐시 디렉토리 생성 (필요한 경우)
+os.makedirs(CACHE_DIR, exist_ok=True)
 
-# 배치 데이터셋을 하나로 병합
-full_dataset = concatenate_datasets([batch['batch'] for batch in loaded_batches])
+original_dataset_name = 'maxseats/aihub-464-preprocessed-680GB-set-0'
+new_dataset_name = 'maxseats/aihub-464-preprocessed-680GB-set-0-2'
+# 허깅페이스 데이터셋 로드
+datasets = load_dataset(original_dataset_name, cache_dir=CACHE_DIR)
 
 # 불필요한 컬럼 제거
-datasets = full_dataset.remove_columns(['audio', 'transcripts'])
-
-
-
-
-
-
-
+datasets = datasets.remove_columns(['audio', 'transcripts'])
+print('-'*48)
+print(type(datasets))
+print(datasets)
+print('-'*48)
 
 # 최종 데이터셋을 허깅페이스에 업로드
 while True:
@@ -57,8 +55,8 @@ while True:
         break
     
     try:
-        datasets.push_to_hub(dataset_name, token=token)
-        print(f"Dataset {dataset_name} pushed to hub successfully.")
+        datasets.push_to_hub(new_dataset_name, token=token)
+        print(f"Dataset {new_dataset_name} pushed to hub successfully.")
         break
     except Exception as e:
         print(f"Failed to push dataset: {e}")
