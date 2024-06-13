@@ -194,7 +194,6 @@ for label in tqdm(label_data):
 df = pd.DataFrame(data=transcript_list, columns = ["transcript"]) # 정답 label
 df['audio_data'] = audio_data # 오디오 파일 경로
 
-
 # 오디오 파일 경로를 dict의 "audio" 키의 value로 넣고 이를 데이터셋으로 변환
 # 이때, Whisper가 요구하는 사양대로 Sampling rate는 16,000으로 설정한다.
 # 데이터셋 배치 처리
@@ -208,7 +207,7 @@ for i in tqdm(range(0, len(df), batch_size), desc="Processing batches"):
     
     batch_datasets = DatasetDict({"batch": ds})
     batch_datasets = batch_datasets.map(prepare_dataset, num_proc=1)
-    batch_datasets.remove_columns_(['audio', 'transcripts'])    # 불필요한 부분 제거
+    batch_datasets.remove_columns(['audio', 'transcripts'])    # 불필요한 부분 제거
     batch_datasets.save_to_disk(os.path.join(CACHE_DIR, f'batch_{i//batch_size}'))
     batches.append(os.path.join(CACHE_DIR, f'batch_{i//batch_size}'))
     print(f"Processed and saved batch {i//batch_size}")
