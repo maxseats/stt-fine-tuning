@@ -3,7 +3,7 @@ import json
 from pydub import AudioSegment
 from tqdm import tqdm
 import re
-from datasets import Audio, Dataset, DatasetDict
+from datasets import Audio, Dataset, DatasetDict, load_from_disk, concatenate_datasets
 from transformers import WhisperFeatureExtractor, WhisperTokenizer
 import pandas as pd
 
@@ -22,6 +22,8 @@ dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-0"              # 허�
 model_name = "SungBeom/whisper-small-ko"                            # 대상 모델 / "openai/whisper-base"
 
 
+batch_size = 4000   # 배치사이즈 지정, 8000이면 에러 발생
+os.environ['HF_DATASETS_CACHE'] = CACHE_DIR
 '''
 데이터셋 경로를 지정해서
 하나의 폴더에 mp3, txt 파일로 추출해요.
@@ -204,18 +206,48 @@ datasets = DatasetDict(
      "valid": test_valid["train"]}
 )
 
-datasets = datasets.map(prepare_dataset, num_proc=1)
 datasets = datasets.remove_columns(['audio', 'transcripts']) # 불필요한 부분 제거
 print('-'*48)
 print(type(datasets))
 print(datasets)
 print('-'*48)
 
+# 데이터셋 배치 처리
+batches = []
+for i in range(0, len(df), batch_size):
+    batch_df = df.iloc[i:i+batch_size]
+    ds = Dataset.from_dict(
+        {"audio": [path for path in batch_df["audio_data"]],
+         "transcripts": [transcript for transcript in batch_df["transcript"]]}
+    ).cast_column("audio", Audio(sampling_rate=16000))
+    
+    batch_datasets = DatasetDict({"batch": ds})
+    batch_datasets = batch_datasets.map(prepare_dataset, num_proc=1)
+    batch_datasets.save_to_disk(os.path.join(CACHE_DIR, f'batch_{i//batch_size}'))
+    batches.append(os.path.join(CACHE_DIR, f'batch_{i//batch_size}'))
+    print(f"Processed and saved batch {i//batch_size}")
+
+# 모든 배치 데이터셋 로드
+loaded_batches = [load_from_disk(path) for path in batches]
+
+# 배치 데이터셋을 하나로 병합
+full_dataset = concatenate_datasets([batch['batch'] for batch in loaded_batches])
+
+# 데이터셋을 훈련 데이터와 테스트 데이터, 밸리데이션 데이터로 분할
+train_testvalid = full_dataset.train_test_split(test_size=0.2)
+test_valid = train_testvalid["test"].train_test_split(test_size=0.5)
+datasets = DatasetDict(
+    {"train": train_testvalid["train"],
+     "test": test_valid["test"],
+     "valid": test_valid["train"]}
+)
+
+
 
 '''
 허깅페이스 로그인 후, 최종 데이터셋을 업로드해요.
 '''
-datasets.save_to_disk('/mnt/a/maxseats/preprocessed_cache.arrow')
+# datasets.save_to_disk('/mnt/a/maxseats/preprocessed_cache.arrow')
 # datasets.push_to_hub(dataset_name, token=token)
 
 while True:
