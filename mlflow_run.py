@@ -19,35 +19,35 @@ model_dir = "./tmp" # 수정 X
 ################################################### 사용자 설정 변수 #####################################################################
 #########################################################################################################################################
 
-model_description = '''
-직접 작성해주세요. 
+model_description = """
+- 파인튜닝 데이터셋 : maxseats/aihub-464-preprocessed-680GB-set-0
 
-파인튜닝한 데이터셋에 대해 최대한 자세히 설명해주세요.
-
-(데이터셋 종류, 각 용량, 관련 링크 등)
-'''
+# 설명
+- 주요 영역별 회의 음성 데이터셋 680GB 중 첫번째 데이터(10GB)를 파인튜닝한 모델입니다.
+- 링크 : https://huggingface.co/datasets/maxseats/aihub-464-preprocessed-680GB-set-0
+"""
 
 # model_name = "openai/whisper-base"
-model_name = "SungBeom/whisper-base-ko" # 대안 : "SungBeom/whisper-small-ko"
+model_name = "SungBeom/whisper-small-ko" # 대안 : "SungBeom/whisper-small-ko"
+dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-0"  # 불러올 데이터셋(허깅페이스 기준)
 
-dataset_name = "maxseats/meeting_valid_preprocessed"    # 불러올 데이터셋(허깅페이스 기준)
+CACHE_DIR = '/mnt/a/maxseats/.finetuning_cache'  # 캐시 디렉토리 지정
+is_test = False  # True: 소량의 샘플 데이터로 테스트, False: 실제 파인튜닝
 
-
-is_test = True # True: 소량의 샘플 데이터로 테스트, False: 실제 파인튜닝
-
+token = "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" # 허깅페이스 토큰 입력
 
 training_args = Seq2SeqTrainingArguments(
     output_dir=model_dir,  # 원하는 리포지토리 이름을 입력한다.
     per_device_train_batch_size=16,
-    gradient_accumulation_steps=1,  # 배치 크기가 2배 감소할 때마다 2배씩 증가
+    gradient_accumulation_steps=2,  # 배치 크기가 2배 감소할 때마다 2배씩 증가
     learning_rate=1e-5,
-    warmup_steps=500,
-    max_steps=2,  # epoch 대신 설정
-    #num_train_epochs=1,     # epoch 수 설정 / max_steps와 이것 중 하나만 설정
+    warmup_steps=1000,
+    # max_steps=2,  # epoch 대신 설정
+    num_train_epochs=1,     # epoch 수 설정 / max_steps와 이것 중 하나만 설정
     gradient_checkpointing=True,
     fp16=True,
     evaluation_strategy="steps",
-    per_device_eval_batch_size=8,
+    per_device_eval_batch_size=16,
     predict_with_generate=True,
     generation_max_length=225,
     save_steps=1000,
@@ -110,10 +110,6 @@ def compute_metrics(pred):
     return {"cer": cer}
 
 
-# 토큰 입력 - maxseats 토큰으로 고정
-token = "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"
-subprocess.run(["huggingface-cli", "login", "--token", token])
-
 
 # model_dir, ./repo 초기화
 if os.path.exists(model_dir):
@@ -137,15 +133,15 @@ model.config.forced_decoder_ids = None
 model.config.suppress_tokens = []
 
                                                         
-# Hub로부터 "16khz 전처리가 완료된" 데이터셋을 로드(이게 진짜 오래걸려요.)
-preprocessed_dataset = load_dataset(dataset_name)
+# Hub로부터 "모든 전처리가 완료된" 데이터셋을 로드(이게 진짜 오래걸려요.)
+preprocessed_dataset = load_dataset(dataset_name, cache_dir=CACHE_DIR)
 
 # 30%까지의 valid 데이터셋 선택(코드 작동 테스트를 위함)
 if is_test:
     preprocessed_dataset["valid"] = preprocessed_dataset["valid"].select(range(math.ceil(len(preprocessed_dataset) * 0.3)))
 
 # 구글 드라이브의 mlflow.db 파일 받아오기(업데이트)
-gdown.download('https://drive.google.com/uc?id=14v7CGtEI4PPOX7rsS6a4LrWCV-AovuPQ', '/mnt/a/maxseats/mlflow.db', quiet=False)
+# gdown.download('https://drive.google.com/uc?id=14v7CGtEI4PPOX7rsS6a4LrWCV-AovuPQ', '/mnt/a/maxseats/mlflow.db', quiet=False)
 
 # training_args 객체를 JSON 형식으로 변환
 training_args_dict = training_args.to_dict()
@@ -207,8 +203,21 @@ with mlflow.start_run(experiment_id=experiment_id, description=model_description
 
 
 
-## 허깅페이스 모델 업로드
+## 허깅페이스 로그인
+while True:
 
+    if token =="exit":
+        break
+
+    try:
+        result = subprocess.run(["huggingface-cli", "login", "--token", token])
+        if result.returncode != 0:
+            raise Exception()
+        break
+    except Exception as e:
+        token = input("Please enter your Hugging Face API token: ")
+
+os.environ["HUGGINGFACE_HUB_TOKEN"] = token
 
 # 리포지토리 이름 설정
 repo_name = "maxseats/" + model_name.replace('/', '-') + '-' + str(model_version)  # 허깅페이스 레포지토리 이름 설정
@@ -216,11 +225,8 @@ repo_name = "maxseats/" + model_name.replace('/', '-') + '-' + str(model_version
 # 리포지토리 생성
 create_repo(repo_name, exist_ok=True)
 
-
-
 # 리포지토리 클론
 repo = Repository(local_dir='./repo', clone_from=f"{repo_name}")
-
 
 # model_dir 필요한 파일 복사
 max_depth = 1  # 순회할 최대 깊이
@@ -238,24 +244,26 @@ for root, dirs, files in os.walk(model_dir):
 # 토크나이저 다운로드 및 로컬 디렉토리에 저장
 tokenizer.save_pretrained('./repo')
 
-
-readme = """
+readme = f"""
 ---
 language: ko
 tags:
 - whisper
 - speech-recognition
 datasets:
-- ai_hub
+- {dataset_name}
 metrics:
 - cer
 ---
-# Model Name : """ + model_name + '\n' + "# Description\n"
+# Model Name : {model_name}
+# Description
+{model_description}
+"""
 
 
 # 모델 카드 및 기타 메타데이터 파일 작성
 with open("./repo/README.md", "w") as f:
-    f.write( readme + model_description)
+    f.write(readme)
 
 # 파일 커밋 푸시
 repo.push_to_hub(commit_message="Initial commit")
