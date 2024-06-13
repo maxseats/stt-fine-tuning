@@ -6,29 +6,33 @@ import re
 from datasets import Audio, Dataset, DatasetDict, load_from_disk, concatenate_datasets
 from transformers import WhisperFeatureExtractor, WhisperTokenizer
 import pandas as pd
+import shutil
 
 # 사용자 지정 변수를 설정해요.
 
 # DATA_DIR = '/mnt/a/maxseats/(주의-원본-680GB)주요 영역별 회의 음성인식 데이터' # 데이터셋이 저장된 폴더
-DATA_DIR = '/mnt/a/maxseats/(주의-원본)split_files/set_0'  # 첫 10GB 테스트
+DATA_DIR = '/mnt/a/maxseats/(주의-원본)split_files/set_1'  # 첫 10GB 테스트
 
 # 원천, 라벨링 데이터 폴더 지정
 json_base_dir = DATA_DIR
 audio_base_dir = DATA_DIR
-output_dir = '/mnt/a/maxseats/(주의-원본)clips_set_0'                     # 가공된 데이터셋이 저장될 폴더
+output_dir = '/mnt/a/maxseats/(주의-원본)clips_set_1'                     # 가공된 데이터셋이 저장될 폴더
 token = "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"                     # 허깅페이스 토큰
 CACHE_DIR = '/mnt/a/maxseats/.cache'                                # 허깅페이스 캐시 저장소 지정
-dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-0"              # 허깅페이스에 올라갈 데이터셋 이름
+dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-1"              # 허깅페이스에 올라갈 데이터셋 이름
 model_name = "SungBeom/whisper-small-ko"                            # 대상 모델 / "openai/whisper-base"
 
 
-batch_size = 4000   # 배치사이즈 지정, 8000이면 에러 발생
+batch_size = 5500   # 배치사이즈 지정, 8000이면 에러 발생
 os.environ['HF_DATASETS_CACHE'] = CACHE_DIR
 '''
 데이터셋 경로를 지정해서
-하나의 폴더에 mp3, txt 파일로 추출해요.
+하나의 폴더에 mp3, txt 파일로 추출해요. (clips_set_i 폴더)
 추출 과정에서 원본 파일은 자동으로 삭제돼요. (저장공간 절약을 위해)
 '''
+
+# 캐시 디렉토리가 없으면 생성
+os.makedirs(CACHE_DIR, exist_ok=True)
 
 def bracket_preprocess(text):
     
@@ -190,31 +194,12 @@ for label in tqdm(label_data):
 df = pd.DataFrame(data=transcript_list, columns = ["transcript"]) # 정답 label
 df['audio_data'] = audio_data # 오디오 파일 경로
 
+
 # 오디오 파일 경로를 dict의 "audio" 키의 value로 넣고 이를 데이터셋으로 변환
 # 이때, Whisper가 요구하는 사양대로 Sampling rate는 16,000으로 설정한다.
-ds = Dataset.from_dict(
-    {"audio": [path for path in df["audio_data"]],
-     "transcripts": [transcript for transcript in df["transcript"]]}
-).cast_column("audio", Audio(sampling_rate=16000))
-
-# 데이터셋을 훈련 데이터와 테스트 데이터, 밸리데이션 데이터로 분할
-train_testvalid = ds.train_test_split(test_size=0.2)
-test_valid = train_testvalid["test"].train_test_split(test_size=0.5)
-datasets = DatasetDict(
-    {"train": train_testvalid["train"],
-     "test": test_valid["test"],
-     "valid": test_valid["train"]}
-)
-
-datasets = datasets.remove_columns(['audio', 'transcripts']) # 불필요한 부분 제거
-print('-'*48)
-print(type(datasets))
-print(datasets)
-print('-'*48)
-
 # 데이터셋 배치 처리
 batches = []
-for i in range(0, len(df), batch_size):
+for i in tqdm(range(0, len(df), batch_size), desc="Processing batches"):
     batch_df = df.iloc[i:i+batch_size]
     ds = Dataset.from_dict(
         {"audio": [path for path in batch_df["audio_data"]],
@@ -223,6 +208,7 @@ for i in range(0, len(df), batch_size):
     
     batch_datasets = DatasetDict({"batch": ds})
     batch_datasets = batch_datasets.map(prepare_dataset, num_proc=1)
+    batch_datasets.remove_columns_(['audio', 'transcripts'])    # 불필요한 부분 제거
     batch_datasets.save_to_disk(os.path.join(CACHE_DIR, f'batch_{i//batch_size}'))
     batches.append(os.path.join(CACHE_DIR, f'batch_{i//batch_size}'))
     print(f"Processed and saved batch {i//batch_size}")
@@ -262,3 +248,7 @@ while True:
     except Exception as e:
         print(f"Failed to push dataset: {e}")
         token = input("Please enter your Hugging Face API token: ")
+
+# 캐시 디렉토리 삭제
+shutil.rmtree(CACHE_DIR)
+print(f"Deleted cache directory: {CACHE_DIR}")
