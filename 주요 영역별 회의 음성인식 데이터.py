@@ -11,19 +11,19 @@ import shutil
 # 사용자 지정 변수를 설정해요.
 
 # DATA_DIR = '/mnt/a/maxseats/(주의-원본-680GB)주요 영역별 회의 음성인식 데이터' # 데이터셋이 저장된 폴더
-DATA_DIR = '/mnt/a/maxseats/(주의-원본)split_files/set_1'  # 첫 10GB 테스트
+DATA_DIR = '/mnt/a/maxseats/(주의-원본)split_files/set_2'  # 첫 10GB 테스트
 
 # 원천, 라벨링 데이터 폴더 지정
 json_base_dir = DATA_DIR
 audio_base_dir = DATA_DIR
-output_dir = '/mnt/a/maxseats/(주의-원본)clips_set_1'                     # 가공된 데이터셋이 저장될 폴더
+output_dir = '/mnt/a/maxseats/(주의-원본)clips_set_2'                     # 가공된 데이터셋이 저장될 폴더
 token = "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"                     # 허깅페이스 토큰
 CACHE_DIR = '/mnt/a/maxseats/.cache'                                # 허깅페이스 캐시 저장소 지정
-dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-1"              # 허깅페이스에 올라갈 데이터셋 이름
+dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-2"              # 허깅페이스에 올라갈 데이터셋 이름
 model_name = "SungBeom/whisper-small-ko"                            # 대상 모델 / "openai/whisper-base"
 
 
-batch_size = 5500   # 배치사이즈 지정, 8000이면 에러 발생
+batch_size = 2000   # 배치사이즈 지정, 8000이면 에러 발생
 os.environ['HF_DATASETS_CACHE'] = CACHE_DIR
 '''
 데이터셋 경로를 지정해서
@@ -178,6 +178,10 @@ def prepare_dataset(batch):
     # target text를 label ids로 변환
     batch["labels"] = tokenizer(batch["transcripts"]).input_ids
     
+    # 'audio'와 'transcripts' 컬럼 제거
+    del batch["audio"]
+    del batch["transcripts"]
+    
     # 'input_features'와 'labels'만 포함한 새로운 딕셔너리 생성
     return {"input_features": batch["input_features"], "labels": batch["labels"]}
 
@@ -207,7 +211,6 @@ for i in tqdm(range(0, len(df), batch_size), desc="Processing batches"):
     
     batch_datasets = DatasetDict({"batch": ds})
     batch_datasets = batch_datasets.map(prepare_dataset, num_proc=1)
-    batch_datasets.remove_columns(['audio', 'transcripts'])    # 불필요한 부분 제거
     batch_datasets.save_to_disk(os.path.join(CACHE_DIR, f'batch_{i//batch_size}'))
     batches.append(os.path.join(CACHE_DIR, f'batch_{i//batch_size}'))
     print(f"Processed and saved batch {i//batch_size}")
