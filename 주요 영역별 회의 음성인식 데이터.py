@@ -179,8 +179,8 @@ def prepare_dataset(batch):
     batch["labels"] = tokenizer(batch["transcripts"]).input_ids
     
     # 'audio'와 'transcripts' 컬럼 제거
-    del batch["audio"]
-    del batch["transcripts"]
+    # del batch["audio"]
+    # del batch["transcripts"]
     
     # 'input_features'와 'labels'만 포함한 새로운 딕셔너리 생성
     return {"input_features": batch["input_features"], "labels": batch["labels"]}
@@ -229,14 +229,12 @@ datasets = DatasetDict(
      "test": test_valid["test"],
      "valid": test_valid["train"]}
 )
-
+datasets = datasets.remove_columns(['audio', 'transcripts']) # 불필요한 부분 제거
 
 
 '''
 허깅페이스 로그인 후, 최종 데이터셋을 업로드해요.
 '''
-# datasets.save_to_disk('/mnt/a/maxseats/preprocessed_cache.arrow')
-# datasets.push_to_hub(dataset_name, token=token)
 
 while True:
     
