@@ -112,13 +112,18 @@ def process_all_files(json_base_dir, audio_base_dir, output_dir):
         os.remove(json_file)
         print(f"Deleted JSON file: {json_file}")
 
-# 디렉토리 생성
-os.makedirs(output_dir, exist_ok=True)
+start_set = 3
+end_set = 68
 
-# 프로세스 실행
-process_all_files(json_base_dir, audio_base_dir, output_dir)
-
-
+for i in range(start_set, end_set + 1):
+    DATA_DIR = f'/mnt/a/maxseats/(주의-원본)split_files/set_{i}'
+    output_dir = f'/mnt/a/maxseats/(주의-원본)mp3_clips/set_{i}'
+    
+    # 디렉토리 생성
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 프로세스 실행
+    process_all_files(DATA_DIR, DATA_DIR, output_dir)
 
 
 
