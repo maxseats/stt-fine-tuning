@@ -11,7 +11,7 @@ import shutil
 # 사용자 지정 변수를 설정해요.
 
 # DATA_DIR = '/mnt/a/maxseats/(주의-원본-680GB)주요 영역별 회의 음성인식 데이터' # 데이터셋이 저장된 폴더
-DATA_DIR = '/mnt/a/maxseats/(주의-원본)split_files/set_2'  # 첫 10GB 테스트
+DATA_DIR = '/mnt/a/maxseats/(주의-원본)split_files/set_2'  # 10GB 단위 데이터
 
 # 원천, 라벨링 데이터 폴더 지정
 json_base_dir = DATA_DIR
@@ -202,6 +202,7 @@ df['audio_data'] = audio_data # 오디오 파일 경로
 # 이때, Whisper가 요구하는 사양대로 Sampling rate는 16,000으로 설정한다.
 # 데이터셋 배치 처리
 batches = []
+print("len(df) : ", len(df))
 for i in tqdm(range(0, len(df), batch_size), desc="Processing batches"):
     batch_df = df.iloc[i:i+batch_size]
     ds = Dataset.from_dict(
@@ -229,7 +230,16 @@ datasets = DatasetDict(
      "test": test_valid["test"],
      "valid": test_valid["train"]}
 )
-datasets = datasets.remove_columns(['audio', 'transcripts']) # 불필요한 부분 제거
+
+# # 열 제거 전 데이터셋 크기 확인
+# print(f"Dataset sizes before column removal: Train: {len(datasets['train'])}, Test: {len(datasets['test'])}, Valid: {len(datasets['valid'])}")
+
+# datasets = datasets.remove_columns(['audio', 'transcripts'])  # 불필요한 부분 제거
+
+# # 열 제거 후 데이터셋 크기 확인
+# print(f"Dataset sizes after column removal: Train: {len(datasets['train'])}, Test: {len(datasets['test'])}, Valid: {len(datasets['valid'])}")
+
+# #datasets = datasets.remove_columns(['audio', 'transcripts']) # 불필요한 부분 제거
 
 
 '''
