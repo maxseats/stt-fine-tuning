@@ -26,9 +26,10 @@ ex)
 
 # model_names = ["openai/whisper-base"]
 # model_version = 29
-model_names = ["SungBeom/whisper-base-ko"]
-model_version = 1
+# model_names = ["SungBeom/whisper-small-ko"]
+# model_version = 1
 
+model_name = 'maxseats/SungBeom-whisper-small-ko-set2'
 
 data_num = 75   # 테스트 데이터 개수
 test_log_path = "/content/drive/MyDrive/STT_test/test_log"    # 테스트 결과 및 로그 저장위치
@@ -40,7 +41,7 @@ data_directory = "discord_dataset"                            # 데이터셋 폴
 
 
 # 모델 이름 및 버전 설정
-model_names = ['maxseats/' + name.replace('/', '-') + '-' + str(model_version) for name in model_names]
+model_names = [model_name]
 
 # 폴더가 없을 경우에만 실행
 if not os.path.exists(data_directory):
