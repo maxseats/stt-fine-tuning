@@ -1,3 +1,12 @@
+# !pip install -U accelerate
+# !pip install -U transformers
+# !pip install datasets
+# !pip install evaluate
+# !pip install mlflow
+# !pip install transformers[torch]
+# !pip install jiwer
+# !pip install nlptutti
+
 from datasets import load_dataset
 import torch
 from dataclasses import dataclass
@@ -10,7 +19,6 @@ import subprocess
 from huggingface_hub import create_repo, Repository
 import os
 import shutil
-import gdown
 import math # 임시 테스트용
 model_dir = "./tmp" # 수정 X
 
@@ -20,16 +28,17 @@ model_dir = "./tmp" # 수정 X
 #########################################################################################################################################
 
 model_description = """
-- 파인튜닝 데이터셋 : maxseats/aihub-464-preprocessed-680GB-set-0
+- 파인튜닝 데이터셋 : maxseats/aihub-464-preprocessed-680GB-set-2
 
 # 설명
-- 주요 영역별 회의 음성 데이터셋 680GB 중 첫번째 데이터(10GB)를 파인튜닝한 모델입니다.
-- 링크 : https://huggingface.co/datasets/maxseats/aihub-464-preprocessed-680GB-set-0
+- AI hub의 주요 영역별 회의 음성 데이터셋을 학습 중이에요.
+- 680GB 중 set_1 데이터(20GB)까지 파인튜닝한 모델을 불러와서, set_2 데이터(10GB)를 학습한 모델입니다.
+- 링크 : https://huggingface.co/datasets/maxseats/aihub-464-preprocessed-680GB-set-2
 """
 
 # model_name = "openai/whisper-base"
-model_name = "SungBeom/whisper-small-ko" # 대안 : "SungBeom/whisper-small-ko"
-dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-0"  # 불러올 데이터셋(허깅페이스 기준)
+model_name = "maxseats/SungBeom-whisper-small-ko-set1" # 대안 : "SungBeom/whisper-small-ko"
+dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-2"  # 불러올 데이터셋(허깅페이스 기준)
 
 CACHE_DIR = '/mnt/a/maxseats/.finetuning_cache'  # 캐시 디렉토리 지정
 is_test = False  # True: 소량의 샘플 데이터로 테스트, False: 실제 파인튜닝
@@ -41,12 +50,12 @@ training_args = Seq2SeqTrainingArguments(
     per_device_train_batch_size=16,
     gradient_accumulation_steps=2,  # 배치 크기가 2배 감소할 때마다 2배씩 증가
     learning_rate=1e-5,
-    warmup_steps=1000,
+    warmup_steps=500,
     # max_steps=2,  # epoch 대신 설정
     num_train_epochs=1,     # epoch 수 설정 / max_steps와 이것 중 하나만 설정
     gradient_checkpointing=True,
     fp16=True,
-    evaluation_strategy="steps",
+    eval_strategy="steps",
     per_device_eval_batch_size=16,
     predict_with_generate=True,
     generation_max_length=225,
@@ -271,3 +280,4 @@ repo.push_to_hub(commit_message="Initial commit")
 # 폴더와 하위 내용 삭제
 shutil.rmtree(model_dir)
 shutil.rmtree('./repo')
+shutil.rmtree(CACHE_DIR)
