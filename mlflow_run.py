@@ -136,6 +136,18 @@ tokenizer = WhisperTokenizer.from_pretrained(model_name, language="Korean", task
 feature_extractor = WhisperFeatureExtractor.from_pretrained(model_name)
 model = WhisperForConditionalGeneration.from_pretrained(model_name)
 
+# GPU 사용 가능 여부 확인
+if torch.cuda.is_available():
+    device = torch.device('cuda')
+    print("GPU is available. Using GPU.")
+else:
+    device = torch.device('cpu')
+    print("GPU is not available. Using CPU.")
+
+# 모델을 GPU로 이동
+model.to(device)
+print("Model is on device:", next(model.parameters()).device)
+
 data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor=processor)
 metric = evaluate.load('cer')
 model.config.forced_decoder_ids = None
