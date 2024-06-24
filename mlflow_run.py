@@ -28,17 +28,17 @@ model_dir = "./tmp" # 수정 X
 #########################################################################################################################################
 
 model_description = """
-- 파인튜닝 데이터셋 : maxseats/aihub-464-preprocessed-680GB-set-2
+- 파인튜닝 데이터셋 : maxseats/aihub-464-preprocessed-680GB-set-3
 
 # 설명
 - AI hub의 주요 영역별 회의 음성 데이터셋을 학습 중이에요.
-- 680GB 중 set_1 데이터(20GB)까지 파인튜닝한 모델을 불러와서, set_2 데이터(10GB)를 학습한 모델입니다.
+- 680GB 중 set_0~2 데이터(30GB)까지 파인튜닝한 모델을 불러와서, set_3 데이터(10GB)를 학습한 모델입니다.
 - 링크 : https://huggingface.co/datasets/maxseats/aihub-464-preprocessed-680GB-set-2
 """
 
 # model_name = "openai/whisper-base"
-model_name = "maxseats/SungBeom-whisper-small-ko-set1" # 대안 : "SungBeom/whisper-small-ko"
-dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-2"  # 불러올 데이터셋(허깅페이스 기준)
+model_name = "maxseats/SungBeom-whisper-small-ko-set2" # 대안 : "SungBeom/whisper-small-ko"
+dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-3"  # 불러올 데이터셋(허깅페이스 기준)
 
 CACHE_DIR = '/mnt/a/maxseats/.finetuning_cache'  # 캐시 디렉토리 지정
 is_test = False  # True: 소량의 샘플 데이터로 테스트, False: 실제 파인튜닝
