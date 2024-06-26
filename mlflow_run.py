@@ -36,23 +36,23 @@ model_description = """
 - 링크 : https://huggingface.co/datasets/maxseats/aihub-464-preprocessed-680GB-set-2
 """
 
-# model_name = "openai/whisper-base"
-model_name = "maxseats/SungBeom-whisper-small-ko-set2" # 대안 : "SungBeom/whisper-small-ko"
-dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-3"  # 불러올 데이터셋(허깅페이스 기준)
+model_name = "maxseats/SungBeom-whisper-small-ko-set2"          # 대안 : "SungBeom/whisper-small-ko"
+dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-3"    # 불러올 데이터셋(허깅페이스 기준)
+repo_name = model_name                                          # 허깅페이스 레포지토리 이름 설정
 
-CACHE_DIR = '/mnt/a/maxseats/.finetuning_cache'  # 캐시 디렉토리 지정
-is_test = False  # True: 소량의 샘플 데이터로 테스트, False: 실제 파인튜닝
+CACHE_DIR = '/mnt/a/maxseats/.finetuning_cache'     # 캐시 디렉토리 지정
+is_test = False                                     # True: 소량의 샘플 데이터로 테스트, False: 실제 파인튜닝
 
-token = "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" # 허깅페이스 토큰 입력
+token = "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"     # 허깅페이스 토큰 입력
 
 training_args = Seq2SeqTrainingArguments(
-    output_dir=model_dir,  # 원하는 리포지토리 이름을 입력한다.
+    output_dir=model_dir,               # 원하는 리포지토리 이름을 입력한다.
     per_device_train_batch_size=16,
-    gradient_accumulation_steps=2,  # 배치 크기가 2배 감소할 때마다 2배씩 증가
+    gradient_accumulation_steps=2,      # 배치 크기가 2배 감소할 때마다 2배씩 증가
     learning_rate=1e-5,
     warmup_steps=500,
-    # max_steps=2,  # epoch 대신 설정
-    num_train_epochs=1,     # epoch 수 설정 / max_steps와 이것 중 하나만 설정
+    # max_steps=2,                      # epoch 대신 설정
+    num_train_epochs=1,                 # epoch 수 설정 / max_steps와 이것 중 하나만 설정
     gradient_checkpointing=True,
     fp16=True,
     eval_strategy="steps",
@@ -64,10 +64,10 @@ training_args = Seq2SeqTrainingArguments(
     logging_steps=25,
     report_to=["tensorboard"],
     load_best_model_at_end=True,
-    metric_for_best_model="cer",  # 한국어의 경우 'wer'보다는 'cer'이 더 적합할 것
+    metric_for_best_model="cer",        # 한국어의 경우 'wer'보다는 'cer'이 더 적합할 것
     greater_is_better=False,
     push_to_hub=True,
-    save_total_limit=5,           # 최대 저장할 모델 수 지정
+    save_total_limit=5,                 # 최대 저장할 모델 수 지정
 )
 
 #########################################################################################################################################
@@ -119,90 +119,158 @@ def compute_metrics(pred):
     return {"cer": cer}
 
 
+# GPU 사용 가능 여부 확인
+def check_GPU():
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+        print("GPU is available. Using GPU.")
+    else:
+        device = torch.device('cpu')
+        print("GPU is not available. Using CPU.")
+    return device
+
 
 # model_dir, ./repo 초기화
-if os.path.exists(model_dir):
-    shutil.rmtree(model_dir)
-    os.makedirs(model_dir)
+def init_dirs():
+    if os.path.exists(model_dir):
+        shutil.rmtree(model_dir)
+        os.makedirs(model_dir)
 
-if os.path.exists('./repo'):
-    shutil.rmtree('./repo')
-    os.makedirs('./repo')
+    if os.path.exists('./repo'):
+        shutil.rmtree('./repo')
+        os.makedirs('./repo')
 
 
-# 파인튜닝을 진행하고자 하는 모델의 processor, tokenizer, feature extractor, model 로드
-processor = WhisperProcessor.from_pretrained(model_name, language="Korean", task="transcribe")
-tokenizer = WhisperTokenizer.from_pretrained(model_name, language="Korean", task="transcribe")
-feature_extractor = WhisperFeatureExtractor.from_pretrained(model_name)
-model = WhisperForConditionalGeneration.from_pretrained(model_name)
+# mlflow 관련 변수 설정
+def set_mlflow_env(model_name):
+    # MLflow UI 관리 폴더 지정
+    mlflow.set_tracking_uri("sqlite:////mnt/a/maxseats/mlflow.db")
 
-# GPU 사용 가능 여부 확인
-if torch.cuda.is_available():
-    device = torch.device('cuda')
-    print("GPU is available. Using GPU.")
-else:
-    device = torch.device('cpu')
-    print("GPU is not available. Using CPU.")
+    experiment_name = model_name    # MLflow 실험 이름 -> 모델 이름으로 설정
+    existing_experiment = mlflow.get_experiment_by_name(experiment_name)
 
-# 모델을 GPU로 이동
-model.to(device)
+    if existing_experiment is not None:
+        experiment_id = existing_experiment.experiment_id
+    else:
+        experiment_id = mlflow.create_experiment(experiment_name)
+
+    return experiment_id
+
+
+# 파인튜닝을 진행하고자 하는 모델의 processor, tokenizer, feature extractor, model, data_collator, metric 로드
+def get_model_variable(model_name):
+
+    processor = WhisperProcessor.from_pretrained(model_name, language="Korean", task="transcribe")
+    tokenizer = WhisperTokenizer.from_pretrained(model_name, language="Korean", task="transcribe")
+    feature_extractor = WhisperFeatureExtractor.from_pretrained(model_name)
+    model = WhisperForConditionalGeneration.from_pretrained(model_name)
+    data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor=processor)
+    metric = evaluate.load('cer')
+
+    model.config.forced_decoder_ids = None
+    model.config.suppress_tokens = []
+    model.to(device)
+    
+    return processor, tokenizer, feature_extractor, model, data_collator, metric
+
+def login_huggingface(token):
+    while True: # 로그인
+        if token =="exit":
+            break
+        try:
+            result = subprocess.run(["huggingface-cli", "login", "--token", token])
+            if result.returncode != 0:
+                raise Exception()
+            break
+        except Exception as e:
+            token = input("Please enter your Hugging Face API token: ")
+
+    os.environ["HUGGINGFACE_HUB_TOKEN"] = token
+
+# model_dir 필요한 파일 복사
+def copy_model(moder_dir):
+    
+    max_depth = 1  # 순회할 최대 깊이
+    
+    for root, dirs, files in os.walk(model_dir):
+        depth = root.count(os.sep) - model_dir.count(os.sep)
+        if depth < max_depth:
+            for file in files:
+                # 파일 경로 생성
+                source_file = os.path.join(root, file)
+                # 대상 폴더에 복사
+                shutil.copy(source_file, './repo')
+    # 토크나이저 다운로드 및 로컬 디렉토리에 저장
+    tokenizer.save_pretrained('./repo')
+
+# 허깅페이스 readme 작성
+def write_readme(dataset_name, model_name, model_description):
+    
+    readme = f"""
+    ---
+    language: ko
+    tags:
+    - whisper
+    - speech-recognition
+    datasets:
+    - {dataset_name}
+    metrics:
+    - cer
+    ---
+    # Model Name : {model_name}
+    # Description
+    {model_description}
+    """
+
+    # 모델 카드 및 기타 메타데이터 파일 작성
+    with open("./repo/README.md", "w") as f:
+        f.write(readme)
+
+# 허깅페이스로 모델 업로드
+def upload_huggingface(token, repo_name, model_dir, tokenizer, dataset_name, model_name, model_description):
+    login_huggingface(token)
+    create_repo(repo_name, exist_ok=True)
+    repo = Repository(local_dir='./repo', clone_from=f"{repo_name}")
+    copy_model(model_dir, tokenizer)
+    repo.push_to_hub(commit_message="Initial commit")
+
+#############################################################   MAIN 시작   ############################################################################
+
+check_GPU()         # GPU 사용 설정
+init_dirs() # model_dir, ./repo 초기화
+processor, tokenizer, feature_extractor, model, data_collator, metric = get_model_variable(model_name)
 print("Model is on device:", next(model.parameters()).device)
+                                        
 
-data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor=processor)
-metric = evaluate.load('cer')
-model.config.forced_decoder_ids = None
-model.config.suppress_tokens = []
+preprocessed_dataset = load_dataset(dataset_name, cache_dir=CACHE_DIR)  # Huggingface 데이터셋 로드
 
-                                                        
-# Hub로부터 "모든 전처리가 완료된" 데이터셋을 로드(이게 진짜 오래걸려요.)
-preprocessed_dataset = load_dataset(dataset_name, cache_dir=CACHE_DIR)
-
-# 30%까지의 valid 데이터셋 선택(코드 작동 테스트를 위함)
-if is_test:
+if is_test: # 30%까지의 valid 데이터셋 선택(코드 작동 테스트를 위함)
     preprocessed_dataset["valid"] = preprocessed_dataset["valid"].select(range(math.ceil(len(preprocessed_dataset) * 0.3)))
 
 # 구글 드라이브의 mlflow.db 파일 받아오기(업데이트)
 # gdown.download('https://drive.google.com/uc?id=14v7CGtEI4PPOX7rsS6a4LrWCV-AovuPQ', '/mnt/a/maxseats/mlflow.db', quiet=False)
 
-# training_args 객체를 JSON 형식으로 변환
-training_args_dict = training_args.to_dict()
+expeirment_id = set_mlflow_env(model_name)
 
-# MLflow UI 관리 폴더 지정
-mlflow.set_tracking_uri("sqlite:////mnt/a/maxseats/mlflow.db")
+trainer = Seq2SeqTrainer(
+    args=training_args,
+    model=model,
+    train_dataset=preprocessed_dataset["train"],
+    eval_dataset=preprocessed_dataset["valid"],  # or "test"
+    data_collator=data_collator,
+    compute_metrics=compute_metrics,
+    tokenizer=processor.feature_extractor,
+)
 
-
-# MLflow 실험 이름을 모델 이름으로 설정
-experiment_name = model_name
-existing_experiment = mlflow.get_experiment_by_name(experiment_name)
-
-if existing_experiment is not None:
-    experiment_id = existing_experiment.experiment_id
-else:
-    experiment_id = mlflow.create_experiment(experiment_name)
-
-
-model_version = 1  # 로깅 하려는 모델 버전(이미 존재하면, 자동 할당)
-
-# MLflow 로깅
+# MLflow 로깅 + train
 with mlflow.start_run(experiment_id=experiment_id, description=model_description):
 
     # training_args 로깅
-    for key, value in training_args_dict.items():
+    for key, value in training_args.to_dict().items():
         mlflow.log_param(key, value)
         
-    
     mlflow.set_tag("Dataset", dataset_name) # 데이터셋 로깅
     
-    trainer = Seq2SeqTrainer(
-        args=training_args,
-        model=model,
-        train_dataset=preprocessed_dataset["train"],
-        eval_dataset=preprocessed_dataset["valid"],  # or "test"
-        data_collator=data_collator,
-        compute_metrics=compute_metrics,
-        tokenizer=processor.feature_extractor,
-    )
-
     trainer.train()
 
     # Metric 로깅
@@ -212,82 +280,12 @@ with mlflow.start_run(experiment_id=experiment_id, description=model_description
 
     # MLflow 모델 레지스터
     model_uri = "runs:/{run_id}/{artifact_path}".format(run_id=mlflow.active_run().info.run_id, artifact_path=model_dir)
-    
-    # 이 값 이용해서 허깅페이스 모델 이름 설정 예정
     model_details = mlflow.register_model(model_uri=model_uri, name=model_name.replace('/', '-'))   # 모델 이름에 '/'를 '-'로 대체
     
-    # 모델 Description
-    client = MlflowClient()
-    client.update_model_version(name=model_details.name, version=model_details.version, description=model_description)
-    model_version = model_details.version   # 버전 정보 허깅페이스 업로드 시 사용
+    # 모델 Description 업데이트
+    MlflowClient().update_model_version(name=model_details.name, version=model_details.version, description=model_description)
 
-
-
-
-## 허깅페이스 로그인
-while True:
-
-    if token =="exit":
-        break
-
-    try:
-        result = subprocess.run(["huggingface-cli", "login", "--token", token])
-        if result.returncode != 0:
-            raise Exception()
-        break
-    except Exception as e:
-        token = input("Please enter your Hugging Face API token: ")
-
-os.environ["HUGGINGFACE_HUB_TOKEN"] = token
-
-# 리포지토리 이름 설정
-repo_name = "maxseats/" + model_name.replace('/', '-') + '-' + str(model_version)  # 허깅페이스 레포지토리 이름 설정
-
-# 리포지토리 생성
-create_repo(repo_name, exist_ok=True)
-
-# 리포지토리 클론
-repo = Repository(local_dir='./repo', clone_from=f"{repo_name}")
-
-# model_dir 필요한 파일 복사
-max_depth = 1  # 순회할 최대 깊이
-
-for root, dirs, files in os.walk(model_dir):
-    depth = root.count(os.sep) - model_dir.count(os.sep)
-    if depth < max_depth:
-        for file in files:
-            # 파일 경로 생성
-            source_file = os.path.join(root, file)
-            # 대상 폴더에 복사
-            shutil.copy(source_file, './repo')
-
-
-# 토크나이저 다운로드 및 로컬 디렉토리에 저장
-tokenizer.save_pretrained('./repo')
-
-readme = f"""
----
-language: ko
-tags:
-- whisper
-- speech-recognition
-datasets:
-- {dataset_name}
-metrics:
-- cer
----
-# Model Name : {model_name}
-# Description
-{model_description}
-"""
-
-
-# 모델 카드 및 기타 메타데이터 파일 작성
-with open("./repo/README.md", "w") as f:
-    f.write(readme)
-
-# 파일 커밋 푸시
-repo.push_to_hub(commit_message="Initial commit")
+upload_huggingface(token, repo_name, model_dir, tokenizer, dataset_name, model_name, model_description)
 
 # 폴더와 하위 내용 삭제
 shutil.rmtree(model_dir)
