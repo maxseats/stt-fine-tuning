@@ -19,12 +19,12 @@ import pandas as pd
 import shutil
 
 # 사용자 지정 변수를 설정해요.
-output_dir = '/mnt/a/maxseats/(주의-원본)mp3_clips/set_10'           # 가공된 데이터셋이 저장된 폴더
+output_dir = '/mnt/a/maxseats/(주의-원본)mp3_clips/set_12'           # 가공된 데이터셋이 저장된 폴더
 token = "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"                     # 허깅페이스 토큰
 CACHE_DIR = './.cache'                                              # 허깅페이스 캐시 저장소 지정
-dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-10"        # 허깅페이스에 올라갈 데이터셋 이름
+dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-12"        # 허깅페이스에 올라갈 데이터셋 이름
 model_name = "SungBeom/whisper-small-ko"                            # 대상 모델 / "openai/whisper-base"
-batch_size = 2000   # 배치사이즈 지정, 8000이면 에러 발생
+batch_size = 1000   # 배치사이즈 지정, 8000이면 에러 발생
 
 
 
