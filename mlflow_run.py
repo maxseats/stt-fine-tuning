@@ -158,7 +158,7 @@ def set_mlflow_env(model_name):
 
 
 # 파인튜닝을 진행하고자 하는 모델의 processor, tokenizer, feature extractor, model, data_collator, metric 로드
-def get_model_variable(model_name):
+def get_model_variable(model_name, device):
 
     processor = WhisperProcessor.from_pretrained(model_name, language="Korean", task="transcribe")
     tokenizer = WhisperTokenizer.from_pretrained(model_name, language="Korean", task="transcribe")
@@ -236,9 +236,9 @@ def upload_huggingface(token, repo_name, model_dir, tokenizer, dataset_name, mod
 
 #############################################################   MAIN 시작   ############################################################################
 
-check_GPU()         # GPU 사용 설정
+device = check_GPU()         # GPU 사용 설정
 init_dirs() # model_dir, ./repo 초기화
-processor, tokenizer, feature_extractor, model, data_collator, metric = get_model_variable(model_name)
+processor, tokenizer, feature_extractor, model, data_collator, metric = get_model_variable(model_name, device)
 print("Model is on device:", next(model.parameters()).device)
                                         
 
@@ -250,7 +250,7 @@ if is_test: # 30%까지의 valid 데이터셋 선택(코드 작동 테스트를 
 # 구글 드라이브의 mlflow.db 파일 받아오기(업데이트)
 # gdown.download('https://drive.google.com/uc?id=14v7CGtEI4PPOX7rsS6a4LrWCV-AovuPQ', '/mnt/a/maxseats/mlflow.db', quiet=False)
 
-expeirment_id = set_mlflow_env(model_name)
+experiment_id = set_mlflow_env(model_name)
 
 trainer = Seq2SeqTrainer(
     args=training_args,
