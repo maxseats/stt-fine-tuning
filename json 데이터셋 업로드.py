@@ -29,7 +29,7 @@ token = "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"                                 
 CACHE_DIR = '/mnt/a/maxseats/.cache_' + str(set_num)                              # 허깅페이스 캐시 저장소 지정
 dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-" + str(set_num)        # 허깅페이스에 올라갈 데이터셋 이름
 model_name = "SungBeom/whisper-small-ko"                                          # 대상 모델 / "openai/whisper-base"
-batch_size = 1000                                                                 # 배치사이즈 지정, 8000이면 에러 발생
+batch_size = 500                                                                 # 배치사이즈 지정, 8000이면 에러 발생
 
 json_path = '/mnt/a/maxseats/mp3_dataset.json'                                    # 생성한 json 데이터셋 위치
 
