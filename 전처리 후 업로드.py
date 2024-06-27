@@ -6,7 +6,7 @@
 # !pip install transformers[torch]
 # !pip install jiwer
 # !pip install nlptutti
-
+# !huggingface-cli login --token token
 
 import os
 import json

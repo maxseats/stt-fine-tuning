@@ -31,9 +31,6 @@ os.environ['HF_DATASETS_CACHE'] = CACHE_DIR
 추출 과정에서 원본 파일은 자동으로 삭제돼요. (저장공간 절약을 위해)
 '''
 
-# 캐시 디렉토리가 없으면 생성
-os.makedirs(CACHE_DIR, exist_ok=True)
-
 def bracket_preprocess(text):
     
     # 정규 표현식을 사용하여 패턴 제거
@@ -120,6 +117,7 @@ def process_all_files(json_base_dir, audio_base_dir, output_dir):
         print(f"Deleted JSON file: {json_file}")
 
 # 디렉토리 생성
+os.makedirs(CACHE_DIR, exist_ok=True)
 os.makedirs(output_dir, exist_ok=True)
 
 # 프로세스 실행
