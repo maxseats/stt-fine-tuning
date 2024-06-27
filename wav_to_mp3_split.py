@@ -58,7 +58,7 @@ def process_audio_and_subtitle(json_path, audio_base_dir, output_dir):
         print(f"Audio file {audio_file} does not exist.")
         return
     
-    audio = AudioSegment.from_mp3(audio_file)
+    audio = AudioSegment.from_wav(audio_file)
     audio_length_ms = len(audio)
     
     # 발화 데이터 처리
