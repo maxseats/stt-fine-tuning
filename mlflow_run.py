@@ -32,8 +32,8 @@ model_description = """
 
 # 설명
 - AI hub의 주요 영역별 회의 음성 데이터셋을 학습 중이에요.
-- 680GB 중 set_0~2 데이터(30GB)까지 파인튜닝한 모델을 불러와서, set_12-testing 데이터(100MB)를 학습한 모델입니다.
-- 링크 : https://huggingface.co/datasets/maxseats/aihub-464-preprocessed-680GB-set-12-testing
+- 680GB 중 set_0~4 데이터(40GB)까지 파인튜닝한 모델을 불러와서, set_5 데이터(10GB)를 학습한 모델입니다.
+- 링크 : https://huggingface.co/datasets/maxseats/aihub-464-preprocessed-680GB-set-5-testing
 """
 
 model_name = "maxseats/SungBeom-whisper-small-ko-set4"          # 대안 : "SungBeom/whisper-small-ko"
@@ -269,77 +269,92 @@ def preprocess_batch(batch):
 #############################################################   MAIN 시작   ############################################################################
 
 
+for set_num in range(5, 13): # 학습할 데이터셋 번호 지정
 
+    model_description = f"""
+    - 파인튜닝 데이터셋 : maxseats/aihub-464-preprocessed-680GB-set-{set_num}
 
-device = check_GPU()         # GPU 사용 설정
-init_dirs() # model_dir, ./repo 초기화
-processor, tokenizer, feature_extractor, model, data_collator, metric = get_model_variable(model_name, device)
-print("Model is on device:", next(model.parameters()).device)
+    # 설명
+    - AI hub의 주요 영역별 회의 음성 데이터셋을 학습 중이에요.
+    - 680GB 중 set_0~{set_num-1} 데이터({set_num-1}0GB)까지 파인튜닝한 모델을 불러와서, set_{set_num} 데이터(10GB)를 학습한 모델입니다.
+    - 링크 : https://huggingface.co/datasets/maxseats/aihub-464-preprocessed-680GB-set-{set_num}-testing
+    """
 
-
-preprocessed_dataset = load_dataset(dataset_name, cache_dir=CACHE_DIR)  # Huggingface 데이터셋 로드
-
-# 데이터셋의 모든 샘플에 전처리 적용
-preprocessed_dataset = preprocessed_dataset.map(preprocess_batch)
-
-
-# 전처리된 데이터셋의 처음, 끝 5개 항목 transcripts 확인
-print("처음 5개 항목의 transcripts 데이터 확인:")
-for i in range(5):
-    print(f"{i+1}번째 항목: {preprocessed_dataset['train'][i]['transcripts']}")
-
-print("\n마지막 5개 항목의 transcripts 데이터 확인:")
-for i in range(1, 6):
-    print(f"{len(preprocessed_dataset['train'])-i+1}번째 항목: {preprocessed_dataset['train'][-i]['transcripts']}")
+    model_name = f"maxseats/SungBeom-whisper-small-ko-set{set_num-1}"          # 대안 : "SungBeom/whisper-small-ko"
+    dataset_name = f"maxseats/aihub-464-preprocessed-680GB-set-{set_num}"    # 불러올 데이터셋(허깅페이스 기준)
+    repo_name = f"maxseats/SungBeom-whisper-small-ko-set{set_num}"                                          # 허깅페이스 레포지토리 이름 설정
 
 
 
+    device = check_GPU()         # GPU 사용 설정
+    init_dirs() # model_dir, ./repo 초기화
+    processor, tokenizer, feature_extractor, model, data_collator, metric = get_model_variable(model_name, device)
+    print("Model is on device:", next(model.parameters()).device)
+    print("<현재 description>\n", model_description)
 
-if is_test: # 30%까지의 valid 데이터셋 선택(코드 작동 테스트를 위함)
-    preprocessed_dataset["valid"] = preprocessed_dataset["valid"].select(range(math.ceil(len(preprocessed_dataset) * 0.3)))
+    preprocessed_dataset = load_dataset(dataset_name, cache_dir=CACHE_DIR)  # Huggingface 데이터셋 로드
 
-# 구글 드라이브의 mlflow.db 파일 받아오기(업데이트)
-# gdown.download('https://drive.google.com/uc?id=14v7CGtEI4PPOX7rsS6a4LrWCV-AovuPQ', '/mnt/a/maxseats/mlflow.db', quiet=False)
+    # 데이터셋의 모든 샘플에 전처리 적용
+    preprocessed_dataset = preprocessed_dataset.map(preprocess_batch)
 
-experiment_id = set_mlflow_env(model_name)
 
-trainer = Seq2SeqTrainer(
-    args=training_args,
-    model=model,
-    train_dataset=preprocessed_dataset["train"],
-    eval_dataset=preprocessed_dataset["valid"],  # or "test"
-    data_collator=data_collator,
-    compute_metrics=compute_metrics,
-    tokenizer=processor.feature_extractor,
-)
+    # 전처리된 데이터셋의 처음, 끝 5개 항목 transcripts 확인
+    print("처음 5개 항목의 transcripts 데이터 확인:")
+    for i in range(5):
+        print(f"{i+1}번째 항목: {preprocessed_dataset['train'][i]['transcripts']}")
 
-# MLflow 로깅 + train
-with mlflow.start_run(experiment_id=experiment_id, description=model_description):
+    print("\n마지막 5개 항목의 transcripts 데이터 확인:")
+    for i in range(1, 6):
+        print(f"{len(preprocessed_dataset['train'])-i+1}번째 항목: {preprocessed_dataset['train'][-i]['transcripts']}")
 
-    # training_args 로깅
-    for key, value in training_args.to_dict().items():
-        mlflow.log_param(key, value)
-        
-    mlflow.set_tag("Dataset", dataset_name) # 데이터셋 로깅
-    
-    trainer.train()
 
-    # Metric 로깅
-    metrics = trainer.evaluate()
-    for metric_name, metric_value in metrics.items():
-        mlflow.log_metric(metric_name, metric_value)
 
-    # MLflow 모델 레지스터
-    model_uri = "runs:/{run_id}/{artifact_path}".format(run_id=mlflow.active_run().info.run_id, artifact_path=model_dir)
-    model_details = mlflow.register_model(model_uri=model_uri, name=model_name.replace('/', '-'))   # 모델 이름에 '/'를 '-'로 대체
 
-    # 모델 Description 업데이트
-    MlflowClient().update_model_version(name=model_details.name, version=model_details.version, description=model_description)
+    if is_test: # 30%까지의 valid 데이터셋 선택(코드 작동 테스트를 위함)
+        preprocessed_dataset["valid"] = preprocessed_dataset["valid"].select(range(math.ceil(len(preprocessed_dataset) * 0.3)))
 
-upload_huggingface(token, repo_name, model_dir, tokenizer, dataset_name, model_name, model_description)
+    # 구글 드라이브의 mlflow.db 파일 받아오기(업데이트)
+    # gdown.download('https://drive.google.com/uc?id=14v7CGtEI4PPOX7rsS6a4LrWCV-AovuPQ', '/mnt/a/maxseats/mlflow.db', quiet=False)
 
-# 폴더와 하위 내용 삭제
-shutil.rmtree(model_dir)
-shutil.rmtree('./repo')
-shutil.rmtree(CACHE_DIR)
-print('완료. 넘나 축하.')
+    experiment_id = set_mlflow_env(model_name)
+
+    trainer = Seq2SeqTrainer(
+        args=training_args,
+        model=model,
+        train_dataset=preprocessed_dataset["train"],
+        eval_dataset=preprocessed_dataset["valid"],  # or "test"
+        data_collator=data_collator,
+        compute_metrics=compute_metrics,
+        tokenizer=processor.feature_extractor,
+    )
+
+    # MLflow 로깅 + train
+    with mlflow.start_run(experiment_id=experiment_id, description=model_description):
+
+        # training_args 로깅
+        for key, value in training_args.to_dict().items():
+            mlflow.log_param(key, value)
+
+        mlflow.set_tag("Dataset", dataset_name) # 데이터셋 로깅
+
+        trainer.train()
+
+        # Metric 로깅
+        metrics = trainer.evaluate()
+        for metric_name, metric_value in metrics.items():
+            mlflow.log_metric(metric_name, metric_value)
+
+        # MLflow 모델 레지스터
+        model_uri = "runs:/{run_id}/{artifact_path}".format(run_id=mlflow.active_run().info.run_id, artifact_path=model_dir)
+        model_details = mlflow.register_model(model_uri=model_uri, name=model_name.replace('/', '-'))   # 모델 이름에 '/'를 '-'로 대체
+
+        # 모델 Description 업데이트
+        MlflowClient().update_model_version(name=model_details.name, version=model_details.version, description=model_description)
+
+    upload_huggingface(token, repo_name, model_dir, tokenizer, dataset_name, model_name, model_description)
+
+    # 폴더와 하위 내용 삭제
+    shutil.rmtree(model_dir)
+    shutil.rmtree('./repo')
+    shutil.rmtree(CACHE_DIR)
+    print('완료. 넘나 축하.')
