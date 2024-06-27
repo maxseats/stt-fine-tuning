@@ -28,17 +28,17 @@ model_dir = "./tmp" # 수정 X
 #########################################################################################################################################
 
 model_description = """
-- 파인튜닝 데이터셋 : maxseats/aihub-464-preprocessed-680GB-set-3
+- 파인튜닝 데이터셋 : maxseats/aihub-464-preprocessed-680GB-set-12-testing
 
 # 설명
 - AI hub의 주요 영역별 회의 음성 데이터셋을 학습 중이에요.
-- 680GB 중 set_0~2 데이터(30GB)까지 파인튜닝한 모델을 불러와서, set_3 데이터(10GB)를 학습한 모델입니다.
-- 링크 : https://huggingface.co/datasets/maxseats/aihub-464-preprocessed-680GB-set-2
+- 680GB 중 set_0~2 데이터(30GB)까지 파인튜닝한 모델을 불러와서, set_12-testing 데이터(100MB)를 학습한 모델입니다.
+- 링크 : https://huggingface.co/datasets/maxseats/aihub-464-preprocessed-680GB-set-12-testing
 """
 
-model_name = "maxseats/SungBeom-whisper-small-ko-set2"          # 대안 : "SungBeom/whisper-small-ko"
-dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-3"    # 불러올 데이터셋(허깅페이스 기준)
-repo_name = model_name                                          # 허깅페이스 레포지토리 이름 설정
+model_name = "maxseats/SungBeom-whisper-small-ko-set4"          # 대안 : "SungBeom/whisper-small-ko"
+dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-5"    # 불러올 데이터셋(허깅페이스 기준)
+repo_name = 'maxseats/SungBeom-whisper-small-ko-set5'                                          # 허깅페이스 레포지토리 이름 설정
 
 CACHE_DIR = '/mnt/a/maxseats/.finetuning_cache'     # 캐시 디렉토리 지정
 is_test = False                                     # True: 소량의 샘플 데이터로 테스트, False: 실제 파인튜닝
@@ -68,13 +68,14 @@ training_args = Seq2SeqTrainingArguments(
     greater_is_better=False,
     push_to_hub=True,
     save_total_limit=5,                 # 최대 저장할 모델 수 지정
+    hub_token=token,                    # 허깅페이스 토큰
 )
 
 #########################################################################################################################################
 ################################################### 사용자 설정 변수 #####################################################################
 #########################################################################################################################################
 
-    
+
 @dataclass
 class DataCollatorSpeechSeq2SeqWithPadding:
     processor: Any
@@ -188,7 +189,7 @@ def login_huggingface(token):
     os.environ["HUGGINGFACE_HUB_TOKEN"] = token
 
 # model_dir 필요한 파일 복사
-def copy_model(moder_dir):
+def copy_model(moder_dir, tokenizer):
     
     max_depth = 1  # 순회할 최대 깊이
     
@@ -205,21 +206,21 @@ def copy_model(moder_dir):
 
 # 허깅페이스 readme 작성
 def write_readme(dataset_name, model_name, model_description):
-    
+
     readme = f"""
-    ---
-    language: ko
-    tags:
-    - whisper
-    - speech-recognition
-    datasets:
-    - {dataset_name}
-    metrics:
-    - cer
-    ---
-    # Model Name : {model_name}
-    # Description
-    {model_description}
+---
+language: ko
+tags:
+- whisper
+- speech-recognition
+datasets:
+- {dataset_name}
+metrics:
+- cer
+---
+# Model Name : {model_name}
+# Description
+{model_description}
     """
 
     # 모델 카드 및 기타 메타데이터 파일 작성
@@ -232,17 +233,67 @@ def upload_huggingface(token, repo_name, model_dir, tokenizer, dataset_name, mod
     create_repo(repo_name, exist_ok=True)
     repo = Repository(local_dir='./repo', clone_from=f"{repo_name}")
     copy_model(model_dir, tokenizer)
+    write_readme(dataset_name, model_name, model_description)
     repo.push_to_hub(commit_message="Initial commit")
+    
+# 라벨 추가 전처리
+def additional_preprocess(text):
+
+    text = re.sub(r'/\([^\)]+\)', '', text)  # /( *) 패턴 제거, /(...) 형식 제거
+    text = text.replace('\n', '')
+    # text = re.sub(r'\(([^/]+)\/([^)]+)\)', r'\1', text)
+    
+    NOISE = ['o', 'n', 'u', 'b', 'l']
+    EXCEPT = ['?', '!', '/', '+', '*', '-', '@', '$', '^', '&', '[', ']', '=', ':', ';', '.', ',', '(', ')']
+    
+    for noise in NOISE:
+        text = text.replace(noise+'/', '')
+        
+    for specialChar in EXCEPT:
+        text = text.replace(specialChar, '')
+
+    text = text.replace('  ', ' ')
+    return text.strip()
+
+def preprocess_batch(batch):
+    
+    # transcripts 컬럼 전처리
+    batch["transcripts"] = additional_preprocess( batch["transcripts"] )
+
+    # label ids로 변환
+    batch["labels"] = tokenizer(batch["transcripts"]).input_ids
+
+    return batch    
+
 
 #############################################################   MAIN 시작   ############################################################################
+
+
+
 
 device = check_GPU()         # GPU 사용 설정
 init_dirs() # model_dir, ./repo 초기화
 processor, tokenizer, feature_extractor, model, data_collator, metric = get_model_variable(model_name, device)
 print("Model is on device:", next(model.parameters()).device)
-                                        
+
 
 preprocessed_dataset = load_dataset(dataset_name, cache_dir=CACHE_DIR)  # Huggingface 데이터셋 로드
+
+# 데이터셋의 모든 샘플에 전처리 적용
+preprocessed_dataset = preprocessed_dataset.map(preprocess_batch)
+
+
+# 전처리된 데이터셋의 처음, 끝 5개 항목 transcripts 확인
+print("처음 5개 항목의 transcripts 데이터 확인:")
+for i in range(5):
+    print(f"{i+1}번째 항목: {preprocessed_dataset['train'][i]['transcripts']}")
+
+print("\n마지막 5개 항목의 transcripts 데이터 확인:")
+for i in range(1, 6):
+    print(f"{len(preprocessed_dataset['train'])-i+1}번째 항목: {preprocessed_dataset['train'][-i]['transcripts']}")
+
+
+
 
 if is_test: # 30%까지의 valid 데이터셋 선택(코드 작동 테스트를 위함)
     preprocessed_dataset["valid"] = preprocessed_dataset["valid"].select(range(math.ceil(len(preprocessed_dataset) * 0.3)))
@@ -281,7 +332,7 @@ with mlflow.start_run(experiment_id=experiment_id, description=model_description
     # MLflow 모델 레지스터
     model_uri = "runs:/{run_id}/{artifact_path}".format(run_id=mlflow.active_run().info.run_id, artifact_path=model_dir)
     model_details = mlflow.register_model(model_uri=model_uri, name=model_name.replace('/', '-'))   # 모델 이름에 '/'를 '-'로 대체
-    
+
     # 모델 Description 업데이트
     MlflowClient().update_model_version(name=model_details.name, version=model_details.version, description=model_description)
 
@@ -291,3 +342,4 @@ upload_huggingface(token, repo_name, model_dir, tokenizer, dataset_name, model_n
 shutil.rmtree(model_dir)
 shutil.rmtree('./repo')
 shutil.rmtree(CACHE_DIR)
+print('완료. 넘나 축하.')
