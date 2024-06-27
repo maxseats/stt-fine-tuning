@@ -20,6 +20,7 @@ from huggingface_hub import create_repo, Repository
 import os
 import shutil
 import math # 임시 테스트용
+import re
 model_dir = "./tmp" # 수정 X
 
 
