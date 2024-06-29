@@ -113,7 +113,7 @@ def upload_huggingface(dataset_name, datasets, token):
 
 
 
-for set_num in range(13, 16):  # 13부터 68까지의 데이터셋 처리 후 업로드
+for set_num in range(14, 16):  # 지정된 데이터셋 처리 후 업로드
 
     CACHE_DIR = '/mnt/a/maxseats/.cache_' + str(set_num)                              # 허깅페이스 캐시 저장소 지정
     dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-" + str(set_num)        # 허깅페이스에 올라갈 데이터셋 이름
