@@ -25,38 +25,39 @@ import math # 임시 테스트용
 
 import logging
 import sys
+import stat
 
 model_dir = "./tmp" # 수정 X
 
-# 로깅 설정
-log_file = './finetuning_output.log'
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s', handlers=[logging.FileHandler(log_file), logging.StreamHandler()])
+# # 로깅 설정
+# log_file = './finetuning_output.log'
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s', handlers=[logging.FileHandler(log_file), logging.StreamHandler()])
 
-logger = logging.getLogger()
-
-
-# 파일이 존재하는 경우 초기화
-if os.path.exists(log_file):
-    with open(log_file, 'w') as f:
-        f.truncate(0)
+# logger = logging.getLogger()
 
 
-# 모든 표준 출력을 로그로 리디렉션
-class StreamToLogger(object):
-    def __init__(self, logger, log_level=logging.INFO):
-        self.logger = logger
-        self.log_level = log_level
-        self.linebuf = ''
+# # 파일이 존재하는 경우 초기화
+# if os.path.exists(log_file):
+#     with open(log_file, 'w') as f:
+#         f.truncate(0)
 
-    def write(self, buf):
-        for line in buf.rstrip().splitlines():
-            self.logger.log(self.log_level, line.rstrip())
 
-    def flush(self):
-        pass
+# # 모든 표준 출력을 로그로 리디렉션
+# class StreamToLogger(object):
+#     def __init__(self, logger, log_level=logging.INFO):
+#         self.logger = logger
+#         self.log_level = log_level
+#         self.linebuf = ''
 
-sys.stdout = StreamToLogger(logger, logging.INFO)
-sys.stderr = StreamToLogger(logger, logging.ERROR)
+#     def write(self, buf):
+#         for line in buf.rstrip().splitlines():
+#             self.logger.log(self.log_level, line.rstrip())
+
+#     def flush(self):
+#         pass
+
+# sys.stdout = StreamToLogger(logger, logging.INFO)
+# sys.stderr = StreamToLogger(logger, logging.ERROR)
 
 
 
@@ -64,8 +65,8 @@ sys.stderr = StreamToLogger(logger, logging.ERROR)
 ################################################### 사용자 설정 변수 #####################################################################
 #########################################################################################################################################
 
+start_num = 12                                      # 시작할 데이터셋 번호
 
-CACHE_DIR = '/mnt/prj/.finetuning_cache'     # 캐시 디렉토리 지정
 is_test = False                                     # True: 소량의 샘플 데이터로 테스트, False: 실제 파인튜닝
 
 token = "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"     # 허깅페이스 토큰 입력
@@ -78,7 +79,7 @@ training_args = Seq2SeqTrainingArguments(
     warmup_steps=500,
     # max_steps=2,                      # epoch 대신 설정
     num_train_epochs=1,                 # epoch 수 설정 / max_steps와 이것 중 하나만 설정
-    gradient_checkpointing=True,
+    gradient_checkpointing=False,
     fp16=True,
     eval_strategy="steps",
     per_device_eval_batch_size=16,
@@ -94,7 +95,7 @@ training_args = Seq2SeqTrainingArguments(
     push_to_hub=True,
     save_total_limit=5,                 # 최대 저장할 모델 수 지정
     hub_token=token,                    # 허깅페이스 토큰
-    # dataloader_num_workers=4,           # 데이터로더 워커 수
+    dataloader_num_workers=4,           # 데이터로더 워커 수
 )
 
 #########################################################################################################################################
@@ -160,28 +161,30 @@ def check_GPU():
 # model_dir, ./repo 초기화
 def init_dirs():
     if os.path.exists(model_dir):
-        shutil.rmtree(model_dir)
+        # shutil.rmtree(model_dir)
+        subprocess.run(["sudo", "rm", "-rf", model_dir])
         os.makedirs(model_dir)
 
     if os.path.exists('./repo'):
-        shutil.rmtree('./repo')
+        # shutil.rmtree('./repo')
+        subprocess.run(["sudo", "rm", "-rf", './repo'])
         os.makedirs('./repo')
 
 
 # mlflow 관련 변수 설정
-# def set_mlflow_env(model_name):
-#     # MLflow UI 관리 폴더 지정
-#     mlflow.set_tracking_uri("sqlite:////mnt/prj/mlflow.db")
+def set_mlflow_env(model_name):
+    # MLflow UI 관리 폴더 지정
+    mlflow.set_tracking_uri("sqlite:////mnt/prj/mlflow.db")
 
-#     experiment_name = model_name    # MLflow 실험 이름 -> 모델 이름으로 설정
-#     existing_experiment = mlflow.get_experiment_by_name(experiment_name)
+    experiment_name = model_name    # MLflow 실험 이름 -> 모델 이름으로 설정
+    existing_experiment = mlflow.get_experiment_by_name(experiment_name)
 
-#     if existing_experiment is not None:
-#         experiment_id = existing_experiment.experiment_id
-#     else:
-#         experiment_id = mlflow.create_experiment(experiment_name)
+    if existing_experiment is not None:
+        experiment_id = existing_experiment.experiment_id
+    else:
+        experiment_id = mlflow.create_experiment(experiment_name)
 
-#     return experiment_id
+    return experiment_id
 
 
 # 파인튜닝을 진행하고자 하는 모델의 processor, tokenizer, feature extractor, model, data_collator, metric 로드
@@ -210,7 +213,10 @@ def login_huggingface(token):
                 raise Exception()
             break
         except Exception as e:
-            token = input("Please enter your Hugging Face API token: ")
+            print(f"Error occurred: {e}")
+            print("Please enter your Hugging Face API token:", end=" ")
+            token = input().strip()
+
 
     os.environ["HUGGINGFACE_HUB_TOKEN"] = token
 
@@ -283,118 +289,112 @@ def additional_preprocess(text):
 
 def preprocess_batch(batch):
 
-    # transcripts 컬럼 전처리
-    batch["transcripts"] = additional_preprocess( batch["transcripts"] )
+    # labels 컬럼 전처리
+    batch["labels"] = additional_preprocess( batch["labels"] )
 
     # label ids로 변환
-    batch["labels"] = tokenizer(batch["transcripts"]).input_ids
+    batch["labels"] = tokenizer(batch["labels"]).input_ids
 
     return batch
 
+def finetune_one_block(set_num, load_num, is_test, training_args, token):
+    model_description = f"""
+    - 파인튜닝 데이터셋 : maxseats/aihub-464-preprocessed-680GB-set-{set_num}
 
-#############################################################   MAIN 시작   ############################################################################
+    # 설명
+    - AI hub의 주요 영역별 회의 음성 데이터셋을 학습 중이에요.
+    - 680GB 중 set_0~{load_num} 데이터({set_num}0GB)까지 파인튜닝한 모델을 불러와서, set_{set_num} 데이터(10GB)를 학습한 모델입니다.
+    - 링크 : https://huggingface.co/datasets/maxseats/aihub-464-preprocessed-680GB-set-{set_num}
+    """
 
+    model_name = f"maxseats/SungBeom-whisper-small-ko-set{load_num}"
+    dataset_name = f"maxseats/aihub-464-preprocessed-680GB-set-{set_num}"
+    repo_name = f"maxseats/SungBeom-whisper-small-ko-set{set_num}"
+    CACHE_DIR = f"/mnt/prj/.finetuning_cache{set_num}"
 
-try:
-    logging.debug("Starting main block")
-    
-    for set_num in range(8, 69): # 학습할 데이터셋 번호 지정
+    # processor, tokenizer, feature_extractor, model, data_collator, metric = get_model_variable(model_name, device)
+    print("Model is on device:", next(model.parameters()).device)
+    print("<현재 description>\n", model_description)
 
-        model_description = f"""
-        - 파인튜닝 데이터셋 : maxseats/aihub-464-preprocessed-680GB-set-{set_num}
+    preprocessed_dataset = load_dataset(dataset_name, cache_dir=CACHE_DIR)
 
-        # 설명
-        - AI hub의 주요 영역별 회의 음성 데이터셋을 학습 중이에요.
-        - 680GB 중 set_0~{set_num-1} 데이터({set_num}0GB)까지 파인튜닝한 모델을 불러와서, set_{set_num} 데이터(10GB)를 학습한 모델입니다.
-        - 링크 : https://huggingface.co/datasets/maxseats/aihub-464-preprocessed-680GB-set-{set_num}
-        """
+    preprocessed_dataset = preprocessed_dataset.map(preprocess_batch)
 
+    print("처음 5개 항목의 labels 데이터 확인:")
+    for i in range(5):
+        print(f"{i+1}번째 항목: {preprocessed_dataset['train'][i]['labels']}")
 
-        # model_name = f"maxseats/SungBeom-whisper-small-ko-set{set_num-1}"          # 대안 : "SungBeom/whisper-small-ko"
-        # dataset_name = f"maxseats/aihub-464-preprocessed-680GB-set-{set_num}"    # 불러올 데이터셋(허깅페이스 기준)
-        # repo_name = f"maxseats/SungBeom-whisper-small-ko-set{set_num}"                                          # 허깅페이스 레포지토리 이름 설정
+    print("\n마지막 5개 항목의 labels 데이터 확인:")
+    for i in range(1, 6):
+        print(f"{len(preprocessed_dataset['train'])-i+1}번째 항목: {preprocessed_dataset['train'][-i]['labels']}")
 
+    if is_test:
+        preprocessed_dataset["valid"] = preprocessed_dataset["valid"].select(range(math.ceil(len(preprocessed_dataset) * 0.3)))
 
-        # 테스트 진행
-        set_num = 12
+    experiment_id = set_mlflow_env(model_name)
 
-    
-        model_name = f"maxseats/SungBeom-whisper-small-ko-set7"          # 대안 : "SungBeom/whisper-small-ko"
-        dataset_name = f"maxseats/aihub-464-preprocessed-680GB-set-12-testing"    # 불러올 데이터셋(허깅페이스 기준)
-        repo_name = f"maxseats/SungBeom-whisper-small-ko-set-testing"                                          # 허깅페이스 레포지토리 이름 설정
+    trainer = Seq2SeqTrainer(
+        args=training_args,
+        model=model,
+        train_dataset=preprocessed_dataset["train"],
+        eval_dataset=preprocessed_dataset["valid"],
+        data_collator=data_collator,
+        compute_metrics=compute_metrics,
+        tokenizer=processor.feature_extractor,
+    )
 
+    with mlflow.start_run(experiment_id=experiment_id, description=model_description):
+        for key, value in training_args.to_dict().items():
+            mlflow.log_param(key, value)
 
-        device = check_GPU()         # GPU 사용 설정
-        init_dirs() # model_dir, ./repo 초기화
-        processor, tokenizer, feature_extractor, model, data_collator, metric = get_model_variable(model_name, device)
-        print("Model is on device:", next(model.parameters()).device)
-        print("<현재 description>\n", model_description)
-
-        preprocessed_dataset = load_dataset(dataset_name, cache_dir=CACHE_DIR)  # Huggingface 데이터셋 로드
-
-        # 데이터셋의 모든 샘플에 전처리 적용
-        preprocessed_dataset = preprocessed_dataset.map(preprocess_batch)
-
-
-        # 전처리된 데이터셋의 처음, 끝 5개 항목 transcripts 확인
-        print("처음 5개 항목의 transcripts 데이터 확인:")
-        for i in range(5):
-            print(f"{i+1}번째 항목: {preprocessed_dataset['train'][i]['transcripts']}")
-
-        print("\n마지막 5개 항목의 transcripts 데이터 확인:")
-        for i in range(1, 6):
-            print(f"{len(preprocessed_dataset['train'])-i+1}번째 항목: {preprocessed_dataset['train'][-i]['transcripts']}")
-
-
-
-
-        if is_test: # 30%까지의 valid 데이터셋 선택(코드 작동 테스트를 위함)
-            preprocessed_dataset["valid"] = preprocessed_dataset["valid"].select(range(math.ceil(len(preprocessed_dataset) * 0.3)))
-
-        # 구글 드라이브의 mlflow.db 파일 받아오기(업데이트)
-        # gdown.download('https://drive.google.com/uc?id=14v7CGtEI4PPOX7rsS6a4LrWCV-AovuPQ', '/mnt/a/maxseats/mlflow.db', quiet=False)
-
-        # experiment_id = set_mlflow_env(model_name)
-
-        trainer = Seq2SeqTrainer(
-            args=training_args,
-            model=model,
-            train_dataset=preprocessed_dataset["train"],
-            eval_dataset=preprocessed_dataset["valid"],  # or "test"
-            data_collator=data_collator,
-            compute_metrics=compute_metrics,
-            tokenizer=processor.feature_extractor,
-        )
-
-        # MLflow 로깅 + train
-        # with mlflow.start_run(experiment_id=experiment_id, description=model_description):
-
-            # # training_args 로깅
-            # for key, value in training_args.to_dict().items():
-            #     mlflow.log_param(key, value)
-
-            # mlflow.set_tag("Dataset", dataset_name) # 데이터셋 로깅
+        mlflow.set_tag("Dataset", dataset_name)
 
         trainer.train()
 
-            # # Metric 로깅
-            # metrics = trainer.evaluate()
-            # for metric_name, metric_value in metrics.items():
-            #     mlflow.log_metric(metric_name, metric_value)
+        metrics = trainer.evaluate()
+        for metric_name, metric_value in metrics.items():
+            mlflow.log_metric(metric_name, metric_value)
 
-            # MLflow 모델 레지스터
-            # model_uri = "runs:/{run_id}/{artifact_path}".format(run_id=mlflow.active_run().info.run_id, artifact_path=model_dir)
-            # model_details = mlflow.register_model(model_uri=model_uri, name=model_name.replace('/', '-'))   # 모델 이름에 '/'를 '-'로 대체
+        model_uri = "runs:/{run_id}/{artifact_path}".format(run_id=mlflow.active_run().info.run_id, artifact_path=model_dir)
+        model_details = mlflow.register_model(model_uri=model_uri, name=model_name.replace('/', '-'))
 
-            # # 모델 Description 업데이트
-            # MlflowClient().update_model_version(name=model_details.name, version=model_details.version, description=model_description)
+        MlflowClient().update_model_version(name=model_details.name, version=model_details.version, description=model_description)
 
-        upload_huggingface(token, repo_name, model_dir, tokenizer, dataset_name, model_name, model_description)
+    while True:
+        try:
+            upload_huggingface(token, repo_name, model_dir, tokenizer, dataset_name, model_name, model_description)
+            break
+        except Exception:
+            logging.error("Error occurred during upload to Hugging Face. Retrying...", exc_info=True)
+            
+    subprocess.run(["sudo", "rm", "-rf", model_dir])
+    subprocess.run(["sudo", "rm", "-rf", './repo'])
+    subprocess.run(["sudo", "rm", "-rf", CACHE_DIR])
+    torch.cuda.empty_cache()
 
-        # 폴더와 하위 내용 삭제
-        shutil.rmtree(model_dir)
-        shutil.rmtree('./repo')
-        shutil.rmtree(CACHE_DIR)
-        print('완료. 넘나 축하.')
-except Exception as e:
-    logging.error("Error occurred", exc_info=True)
+    print('완료. 넘나 축하.\n\n\n')
+    
+#############################################################   MAIN 시작   ############################################################################
+
+
+while start_num < 69:
+    try:
+        logging.debug("Starting main block")
+        device = check_GPU()  # GPU 사용 설정
+
+        while start_num < 69:  # 학습할 데이터셋 번호 지정
+            
+            if start_num == 11:
+                load_num = start_num-2  # 불러올 모델 번호
+            else:
+                load_num = start_num-1  
+            
+            model_name = f"maxseats/SungBeom-whisper-small-ko-set{load_num}"
+            processor, tokenizer, feature_extractor, model, data_collator, metric = get_model_variable(model_name, device)
+            init_dirs()
+            finetune_one_block(start_num, load_num, is_test, training_args, token)
+            start_num += 1  # 성공적으로 완료되면 다음 start_num으로 이동
+
+    except Exception:
+        logging.error("Error occurred", exc_info=True)
+        # 에러 발생 시 현재 set_num 유지, while 루프는 계속 실행
