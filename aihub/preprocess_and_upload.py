@@ -20,7 +20,7 @@ import shutil
 
 # 사용자 지정 변수를 설정해요.
 output_dir = '/mnt/a/maxseats/(주의-원본)mp3_clips/set_12'           # 가공된 데이터셋이 저장된 폴더
-token = "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"                     # 허깅페이스 토큰
+token = "hf_"                     # 허깅페이스 토큰
 CACHE_DIR = './.cache'                                              # 허깅페이스 캐시 저장소 지정
 dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-12"        # 허깅페이스에 올라갈 데이터셋 이름
 model_name = "SungBeom/whisper-small-ko"                            # 대상 모델 / "openai/whisper-base"
@@ -153,15 +153,15 @@ full_dataset = df_transform(batch_size, prepare_dataset)
 datasets = make_dataset(full_dataset)
 
 
-# # 열 제거 전 데이터셋 크기 확인
-# print(f"Dataset sizes before column removal: Train: {len(datasets['train'])}, Test: {len(datasets['test'])}, Valid: {len(datasets['valid'])}")
+# 열 제거 전 데이터셋 크기 확인
+print(f"Dataset sizes before column removal: Train: {len(datasets['train'])}, Test: {len(datasets['test'])}, Valid: {len(datasets['valid'])}")
 
-# datasets = datasets.remove_columns(['audio', 'transcripts'])  # 불필요한 부분 제거
+datasets = datasets.remove_columns(['audio', 'transcripts'])  # 불필요한 부분 제거
 
-# # 열 제거 후 데이터셋 크기 확인
-# print(f"Dataset sizes after column removal: Train: {len(datasets['train'])}, Test: {len(datasets['test'])}, Valid: {len(datasets['valid'])}")
+# 열 제거 후 데이터셋 크기 확인
+print(f"Dataset sizes after column removal: Train: {len(datasets['train'])}, Test: {len(datasets['test'])}, Valid: {len(datasets['valid'])}")
 
-# #datasets = datasets.remove_columns(['audio', 'transcripts']) # 불필요한 부분 제거
+#datasets = datasets.remove_columns(['audio', 'transcripts']) # 불필요한 부분 제거
 
 
 upload_huggingface(dataset_name, datasets, token)

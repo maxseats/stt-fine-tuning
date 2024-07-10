@@ -29,7 +29,7 @@ ex)
 # model_names = ["SungBeom/whisper-small-ko"]
 # model_version = 1
 
-model_name = 'maxseats/SungBeom-whisper-small-ko-set2'
+model_name = 'maxseats/SungBeom-whisper-small-ko-set8'
 
 data_num = 75   # 테스트 데이터 개수
 test_log_path = "/content/drive/MyDrive/STT_test/test_log"    # 테스트 결과 및 로그 저장위치

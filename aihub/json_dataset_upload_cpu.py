@@ -18,14 +18,10 @@ from transformers import WhisperFeatureExtractor, WhisperTokenizer
 import pandas as pd
 import shutil
 
-import torch
-import torchaudio
-import torchaudio.transforms as transforms
-
 # 사용자 지정 변수를 설정해요.
 
-set_num = 14                                                                       # 데이터셋 번호
-token = "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"                                   # 허깅페이스 토큰
+set_num = 12                                                                       # 데이터셋 번호
+token = "hf_"                                   # 허깅페이스 토큰
 CACHE_DIR = '/mnt/a/maxseats/.cache_' + str(set_num)                              # 허깅페이스 캐시 저장소 지정
 dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-" + str(set_num)        # 허깅페이스에 올라갈 데이터셋 이름
 model_name = "SungBeom/whisper-small-ko"                                          # 대상 모델 / "openai/whisper-base"
@@ -35,47 +31,12 @@ json_path = '/mnt/a/maxseats/mp3_dataset.json'                                  
 
 print('현재 데이터셋 : ', 'set_', set_num)
 
-
-# FeatureExtractor 클래스 정의
-class FeatureExtractor:
-    def __init__(self, sample_rate=16000, n_mels=64):
-        self.sample_rate = sample_rate
-        self.n_mels = n_mels
-        self.mel_spectrogram_transform = transforms.MelSpectrogram(
-            sample_rate=self.sample_rate,
-            n_mels=self.n_mels
-        )
-        self.amplitude_to_db = transforms.AmplitudeToDB()
-    
-    def to_device(self, device):
-        self.mel_spectrogram_transform.spectrogram.window = self.mel_spectrogram_transform.spectrogram.window.to(device)
-        self.mel_spectrogram_transform.mel_scale.fb = self.mel_spectrogram_transform.mel_scale.fb.to(device)
-        
-    def __call__(self, audio_tensor):
-        # Mel 스펙트로그램 변환
-        mel_spectrogram = self.mel_spectrogram_transform(audio_tensor)
-        # log-Mel 스펙트로그램 변환
-        log_mel_spectrogram = self.amplitude_to_db(mel_spectrogram)
-        return log_mel_spectrogram
-
-
 def prepare_dataset(batch):
-    
     # 오디오 파일을 16kHz로 로드
     audio = batch["audio"]
 
-    # GPU로 오디오 데이터를 텐서로 변환하고 float32로 캐스팅
-    audio_tensor = torch.tensor(audio["array"], dtype=torch.float32).to(device=torch.device("cuda"))
-
-    # 예시 feature_extractor 인스턴스 (GPU로 전처리 수행)
-    feature_extractor = FeatureExtractor()
-    feature_extractor.to_device(audio_tensor.device)
-
     # input audio array로부터 log-Mel spectrogram 변환
-    log_mel_spectrogram = feature_extractor(audio_tensor.unsqueeze(0))
-
-    # 첫 번째 스펙트로그램 프레임을 CPU로 이동
-    batch["input_features"] = log_mel_spectrogram[0].cpu()
+    batch["input_features"] = feature_extractor(audio["array"], sampling_rate=audio["sampling_rate"]).input_features[0]
 
     # 'input_features'와 'labels'만 포함한 새로운 딕셔너리 생성
     return {"input_features": batch["input_features"], "labels": batch["labels"]}
@@ -150,7 +111,9 @@ def upload_huggingface(dataset_name, datasets, token):
             print(f"Failed to push dataset: {e}")
             token = input("Please enter your Hugging Face API token: ")
 
-for set_num in range(13, 69):  # 13부터 68까지의 데이터셋 처리 후 업로드
+
+
+for set_num in range(33, 69):  # 지정된 데이터셋 처리 후 업로드
 
     CACHE_DIR = '/mnt/a/maxseats/.cache_' + str(set_num)                              # 허깅페이스 캐시 저장소 지정
     dataset_name = "maxseats/aihub-464-preprocessed-680GB-set-" + str(set_num)        # 허깅페이스에 올라갈 데이터셋 이름
