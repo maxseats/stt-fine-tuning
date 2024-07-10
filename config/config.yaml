@@ -1,0 +1,36 @@
+model_name: "SungBeom/whisper-small-ko"
+dataset_name: "maxseats/meeting_valid_preprocessed"  # 불러올 데이터셋(허깅페이스 기준)
+model_description: |
+  직접 작성해주세요.
+
+  파인튜닝한 데이터셋에 대해 최대한 자세히 설명해주세요.
+  
+  (데이터셋 종류, 각 용량, 관련 링크 등)
+
+training_args:
+  output_dir: "./.tmp"   # <- 수정이 필요할 듯
+  per_device_train_batch_size: 16
+  gradient_accumulation_steps: 1
+  learning_rate: .00001
+  warmup_steps: 500
+  max_steps: 2 # epoch 대신 설정
+  # num_train_epochs: 1 # epoch 수 설정 / max_steps와 이것 중 하나만 설정
+  gradient_checkpointing: true
+  fp16: true
+  eval_strategy: "steps"
+  per_device_eval_batch_size: 8
+  predict_with_generate: true
+  generation_max_length: 225
+  save_steps: 1000
+  eval_steps: 1000
+  logging_steps: 25
+  report_to: ["tensorboard"]
+  load_best_model_at_end: true
+  metric_for_best_model: "cer"  # 한국어의 경우 'wer'보다는 'cer'이 더 적합할 것
+  greater_is_better: false
+  push_to_hub: false
+  save_total_limit: 5 # 최대 저장할 모델 수 지정
+
+mlflow:
+  tracking_uri: "sqlite:////mnt/a/mlflow.db"
+  # tracking_uri: ""
