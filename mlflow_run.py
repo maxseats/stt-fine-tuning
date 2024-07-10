@@ -1,27 +1,22 @@
-# !pip install -U accelerate
-# !pip install -U transformers
-# !pip install datasets
-# !pip install evaluate
-# !pip install mlflow
-# !pip install transformers[torch]
-# !pip install jiwer
-# !pip install nlptutti
-
-from datasets import load_dataset
-import torch
-from dataclasses import dataclass
-from typing import Any, Dict, List, Union
-import evaluate
-from transformers import WhisperTokenizer, WhisperFeatureExtractor, WhisperProcessor, WhisperForConditionalGeneration, Seq2SeqTrainingArguments, Seq2SeqTrainer
-import mlflow
-from mlflow.tracking.client import MlflowClient
-import subprocess
-from huggingface_hub import create_repo, Repository
+import math  # 임시 테스트용
 import os
 import shutil
-import math # 임시 테스트용
-import re
-model_dir = "./tmp" # 수정 X
+import subprocess
+from dataclasses import dataclass
+from typing import Any, Dict, List, Union
+
+import evaluate
+import mlflow
+import torch
+from datasets import load_dataset
+from huggingface_hub import Repository, create_repo
+from mlflow.tracking.client import MlflowClient
+from transformers import (Seq2SeqTrainer, Seq2SeqTrainingArguments,
+                          WhisperFeatureExtractor,
+                          WhisperForConditionalGeneration, WhisperProcessor,
+                          WhisperTokenizer)
+
+model_dir = "./tmp"  # 수정 X
 
 
 #########################################################################################################################################
@@ -130,6 +125,9 @@ def check_GPU():
         device = torch.device('cpu')
         print("GPU is not available. Using CPU.")
     return device
+# 토큰 입력 - maxseats 토큰으로 고정
+token = "토큰"
+subprocess.run(["huggingface-cli", "login", "--token", token])
 
 
 # model_dir, ./repo 초기화
@@ -141,6 +139,9 @@ def init_dirs():
     if os.path.exists('./repo'):
         shutil.rmtree('./repo')
         os.makedirs('./repo')
+if os.path.exists("./repo"):
+    shutil.rmtree("./repo")
+    os.makedirs("./repo")
 
 
 # mlflow 관련 변수 설정
