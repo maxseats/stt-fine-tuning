@@ -19,6 +19,3 @@ python main.py
 ```
 mlflow server --host 127.0.0.1 --port 5000 --backend-store-uri sqlite:////mnt/a/mlflow.db # <- yaml 파일에 쓰여져있는 경로와 일치
 ```
-## Future works
-- [ ] inference
-- [ ] 
